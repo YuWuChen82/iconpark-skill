@@ -73,7 +73,7 @@ description: "Use when a designer is preparing an IconPark icon and needs help w
 **host agent 必须按此顺序执行**(每步都有显式输出):
 
 1. **收输入** — 设计师给 SVG 路径 或 中文描述(可两者)
-2. **读 SVG** — 解析 `<title>` / `<desc>` / 注释 / `data-*` 属性
+2. **读 SVG** — 解析以下 **8 类渠道** 全量提取文本/结构信号(详见 §📖 步骤 2 读 SVG 8 渠道清单),让 host agent 通过**多渠道文本/结构**而非 path 像素推断形状
 3. **算置信度** — `high` / `medium` / `low`(基于 metadata 完整度)
 4. **取名字** — 命中 `assets/goodcase/` 风格 → 输出 **主推 1 个** + **备选 2-3 个** `jc-icon-<kebab-case>`;命中 `assets/badcase/` 模式 → 走"剥离业务前缀/剥年份/问形状"流程,候选同样给 2-3 个
 5. **选主分类** — 从 36 官方语义分类(优先 11 高频 + goodcase 分布)**主推 1 个 + 备选 2-3 个**(共 3-4 个候选,让设计师选)
@@ -82,6 +82,136 @@ description: "Use when a designer is preparing an IconPark icon and needs help w
 8. **输出卡片** — 命名 + 主分类 + 辅分类 + 复制粘贴文本(卡片是"待确认草稿",不是"已采纳结果")
 9. **触发检查点** — `low` 置信度 / badcase 命中 / 业务前缀 → 🔴 必须用"多轮动态问题"问设计师(见下节)
 10. **落库** — 设计师确认后输出最终 `jc-icon-xxx` 写入 IconPark 后台
+
+## 📖 步骤 2 读 SVG 8 渠道清单(让 host agent 多渠道推断形状)
+
+> **核心原则**:**不靠 path 像素识别**视觉形状(违反 §🛑 STOP 红线 #1),但**全量解析**下面 8 类渠道,让 host agent 通过文本/结构信号**推断** icon 形状、命名、分类。每多 1 个渠道命中,置信度 +1 级。
+
+### 渠道 1:标准 SVG metadata
+
+```xml
+<svg>
+  <title>双星</title>           <!-- 优先级最高:中文名 -->
+  <desc>两颗叠加的星星</desc>    <!-- 形状描述 -->
+  <metadata>...</metadata>       <!-- 通用元数据 -->
+</svg>
+```
+
+- ✅ `<title>` = **最优先**,直接当中文名输入
+- ✅ `<desc>` = 形状描述,辅助推断
+- ❌ 禁止:跳过 `<title>` 直接用文件名
+
+### 渠道 2:data-* 自定义属性(Figma/Sketch/IconPark 导出常见)
+
+```xml
+<svg data-name="双星" data-zh="双星" data-en="star-double" data-icon-name="jc-icon-star" data-category="界面组件">
+```
+
+- ✅ `data-name` / `data-zh` = 中文名
+- ✅ `data-en` = 英文名候选
+- ✅ `data-icon-name` = 已存在的 identifier(直接采纳)
+- ✅ `data-category` = 主分类(直接采纳)
+- ❌ 禁止:只解析 `data-name` 就停,其他 data-* 字段全部丢失
+
+### 渠道 3:全部注释(设计师/工具的"隐藏信息")
+
+```xml
+<!-- Component: 双星图标 -->
+<!-- Layer: 星形-大 -->
+<!-- Layer: 星形-小 -->
+<!-- Generator: Figma -->
+<!-- Group: 界面组件/收藏 -->
+```
+
+- ✅ **强制解析所有 `<!-- xxx -->` 注释**(包括 Figma 导出的"组件名/图层名/分组")
+- ✅ 中文图层名(`星形-大`)拼起来当形状描述
+- ✅ `Generator: Figma` 提示导出工具,Figma 注释通常含中文
+- ❌ 禁止:跳过注释只读 attribute
+
+### 渠道 4:无障碍属性(aria)
+
+```xml
+<svg role="img" aria-label="双星图标" aria-labelledby="title-id">
+```
+
+- ✅ `aria-label` = 中文名(辅助 <title> 缺失场景)
+- ✅ `role="img"` 标识这是图标(非装饰元素)
+
+### 渠道 5:命名空间属性(Inkscape/Figma 插件导出)
+
+```xml
+<svg xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     xmlns:figma="http://www.figma.com/figma/ns"
+     inkscape:label="双星"
+     sodipodi:role="主图标"
+     figma:node-id="1:23">
+```
+
+- ✅ `inkscape:label` / `sodipodi:role` = Inkscape 导出时的中文标签
+- ✅ `figma:node-id` = Figma 节点 ID(辅助追溯)
+- ❌ 禁止:忽略命名空间属性,只读标准 SVG 属性
+
+### 渠道 6:group 分组 + transform(复合图标结构)
+
+```xml
+<g id="star-large" transform="rotate(15 24 24)">
+  <path d="M24 4 L29 19 L44 19 L32 28 L37 43 L24 34 L11 43 L16 28 L4 19 L19 19 Z"/>
+</g>
+<g id="star-small" transform="translate(30 30) scale(0.5)">
+  <path d="..."/>
+</g>
+```
+
+- ✅ 每个 `<g id="xxx">` = 一个子元素,`id` 常含中文(设计软件导出习惯)
+- ✅ `transform` 含 `rotate(N)` 提示图标有旋转(星/箭头/雪花等)
+- ✅ `scale(N)` 提示子元素大小比例(双星 = 一大一小)
+
+### 渠道 7:defs/symbol/use(IconPark 风格复合图标)
+
+```xml
+<defs>
+  <symbol id="icon-star" viewBox="0 0 48 48">
+    <path d="M24 4 L29 19 L44 19 L32 28 ..."/>
+  </symbol>
+</defs>
+<use href="#icon-star"/>
+```
+
+- ✅ `<symbol id="icon-xxx">` 的 `id` = icon 名称(IconPark 标准做法)
+- ✅ `<use href="#xxx">` 引用 symbol,推断"组合图标"
+
+### 渠道 8:path d 命令关键字(几何特征,非像素识别)
+
+> ⚠️ **不靠 d 数据猜形状**(违反 STOP 红线),但**统计 d 中的命令关键字**作为形状复杂度的辅助信号。
+
+```xml
+<path d="M24 4 A20 20 0 1 1 24 44 A20 20 0 1 1 24 4 Z"/>   <!-- 圆 -->
+<path d="M24 4 L44 24 L24 44 L4 24 Z"/>                      <!-- 菱形 -->
+<path d="M24 4 L29 19 L44 19 L32 28 L37 43 L24 34 L11 43 L16 28 L4 19 L19 19 Z"/>  <!-- 星 -->
+```
+
+| d 命令关键字 | 几何特征 | 可能形状(仅信号,非定论) |
+|---|---|---|
+| `A` 出现 ≥ 2 | 圆弧 | 圆/椭圆/圆角矩形 |
+| `L` 连续 ≥ 3 个 | 直线段 | 多边形(三角/方/菱/星) |
+| `C` 出现 ≥ 1 | 贝塞尔曲线 | 有机形状(云/水滴/心) |
+| `Q` 出现 ≥ 1 | 二次曲线 | 平滑曲线(弧/钩) |
+| `Z` 出现 ≥ 1 | 闭合 | 完整图形 |
+
+- ✅ 用于"辅分类"判断(纯 L+Z = 折线图标 → 常规线性;C 多 = 有机图标 → 渐变色常见)
+- ❌ 禁止:**不要**用 d 数据**推断视觉语义**("这个 d 看起来像星 → 所以这是星") — 违反 STOP 红线 #1
+- ❌ 禁止:把"d 看起来像 X"作为命名依据 — 命名必须靠渠道 1-5 文本信号
+
+### 8 渠道优先级与置信度
+
+| 渠道数命中 | 置信度 | 后续动作 |
+|---|---|---|
+| 渠道 1(`<title>`)+ 渠道 2(`data-name`)+ 渠道 3(注释) 三者都命中 | **high** | 直接命名+分类,跳过形状问 |
+| 渠道 1 或 2 之一命中 | **medium** | 给 2-3 个候选 + 弹选项问"哪个更准" |
+| 渠道 3-8 部分命中(只有注释/分组名/aria) | **medium** | 弹选项问"实际形状" |
+| 8 个渠道都未命中 | **low** | 🔴 必须问设计师实际形状(违反则触发 §🛑 反例黑名单) |
+
+> 💡 **优势**:多数 SVG 文件**至少 3 个渠道**会命中(Figma 导出的 SVG 通常有 title + data-* + 注释),置信度大概率是 medium 以上,设计师被问"实际形状"的频率大幅降低。
 
 ## 🔴 CHECKPOINT 触发"多轮动态问题"规则(runtime-neutral)
 
