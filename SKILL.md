@@ -1,7 +1,7 @@
 ---
 name: iconpark
 version: 0.3.0
-description: "Use when a designer is preparing an IconPark icon and needs help with naming or two-tier categorization. Given an SVG file or Chinese description, recommends a standard identifier name, a primary semantic category (one of 36 official IconPark categories), an optional color sub-category (one of 7). Learns from goodcase/badcase reference sets in `assets/goodcase/` and `assets/badcase/` directories. Triggers: 'check SVG', '推荐名字', '选分组', '该放哪个分类', '命名不规范', 'jc-icon-', 'IconPark 上传'."
+description: "Use when a designer is preparing an IconPark icon and needs help with naming or two-tier categorization. Given an SVG file or Chinese description, recommends a standard identifier name, a primary semantic category (one of 36 official IconPark categories), an optional color sub-category (one of 7). Learns from goodcase/badcase reference sets in `assets/goodcase/` and `assets/badcase/` directories. Runtime-neutral: works in Claude Code (AskUserQuestion), Codex CLI (request_user_input), OpenCode (TUI question), Hermes (prompt_user), Gemini CLI (request_user_input). Triggers: 'check SVG', '推荐名字', '选分组', '该放哪个分类', '命名不规范', 'jc-icon-', 'IconPark 上传'."
 ---
 
 # IconPark 图标设计师助手
@@ -20,7 +20,6 @@ description: "Use when a designer is preparing an IconPark icon and needs help w
 ### 2. 必须弹选项,禁止纯文字自问自答(runtime-neutral)
 
 - ✅ **任何需要设计师决策的点都必须用多选项交互工具弹出 2-4 个互斥选项**,系统会自动提供"其它"兜底(允许自由输入)。
-- ✅ 实现:Claude Code 用 `AskUserQuestion`;其他 runtime 用**等效多选项工具**(`AskUserQuestion` / `request_user_input` / `prompt_user` 等)。
 - ✅ 选项设计原则:
   - **2-4 个互斥选项**(命名/分类推荐时**至少 2-3 个候选**,避免只给 1 个让设计师无选择)
   - 推荐项在 label 末尾加"(推荐)"
@@ -28,6 +27,22 @@ description: "Use when a designer is preparing an IconPark icon and needs help w
 - ❌ 禁止:**"请问您想要什么?"** / **"请告诉我您的偏好"** 这种开放式纯文字问法 —— 设计师认知负担重,响应慢。
 - ❌ 禁止:代设计师直接做决定(比如"我推断是 X,继续")而不给选项。
 - 🔴 **CHECKPOINT — 弹选项触发条件**:low 置信度 / badcase 命中 / 业务前缀 / 中文泛词 / 颜色冲突 / 分类歧义,任一命中**必须弹**。
+
+#### 多 Runtime 弹选项工具映射表
+
+> **核心原则**:不管 host agent 跑在哪个 runtime,都**必须**用该 runtime 提供的**多选项交互工具**弹选项,而不是纯文字输出。下面是 5 个主流 runtime 的对应工具,host agent 加载本 skill 时按当前 runtime 取对应列。
+
+| Runtime | 工具名 | 启用方式 | 备注 |
+|---|---|---|---|
+| **Claude Code** | `AskUserQuestion` | 内置,直接调用 | 当前 §实现示例用的就是这个 |
+| **Codex CLI** | `request_user_input` | 需在 `config.toml` 启用 `experimental_request_user_input = true` | 官方 commit `e0435af`(2026-06-05 合入) |
+| **OpenCode** | TUI 内置 `question` 工具 | 内置,通过 `permissions.questions` 配置 | TUI 风格,无独立 API |
+| **Hermes** | `prompt_user` | 内置 | 通用多选 prompt |
+| **Gemini CLI** | `request_user_input` | 内置 | 复用 Codex 类似的 schema |
+
+- ❌ **禁止 host agent 只在 Claude Code 跑得通就完事** —— 必须按当前 runtime 选对应工具。
+- ❌ **禁止**"我用的 runtime 没这个工具,所以跳过弹选项" —— 这是**逃避决策**,应该改用纯文字 + 强制等待(见下)或建议用户切换 runtime。
+- ✅ **回退方案**(runtime 无多选项工具时):用 `Read` 工具读一个设计师已知路径的"决策文件",让设计师在文件里写选项编号后回读 —— 不允许口头让设计师"回答 1/2/3"。
 
 ### 3. 必须等用户选,未选=未完成(runtime-neutral)
 
@@ -166,6 +181,86 @@ if (svgHasGradientOrMulticolor) {
 }
 ```
 
+### 多 Runtime 实现对照(必读)
+
+> **问题**:Claude Code 用 `AskUserQuestion` 跑得好,但 host agent 跑在 **Codex / OpenCode / Hermes / Gemini CLI** 时怎么办?下面给出 4 个 runtime 的等价实现,host agent 按当前 runtime 选对应段落。
+
+#### Codex CLI 实现
+
+```js
+// Codex CLI — 用 experimental_request_user_input
+// 前提: ~/.codex/config.toml 配 experimental_request_user_input = true
+const shape = await tools.request_user_input({
+  questions: [{
+    question: "这个图标实际形状是什么?",
+    header: "形状",
+    options: [
+      {label: "感叹号/警告三角 (推荐)", description: "单纯警告符号"},
+      {label: "水晶+感叹号", description: "AI 风格的水晶出错图标"},
+      {label: "机器人/人形", description: "类似表情的'困惑/失败'角色"},
+      {label: "其它形状", description: "告诉我具体形状"}
+    ],
+    multi_select: false  // 注意:Codex 用 snake_case,Claude Code 用 camelCase
+  }]
+})
+```
+
+#### OpenCode 实现
+
+```js
+// OpenCode — 用 TUI 内置 question 工具,通过 permissions.questions 配置
+// 配置 ~/.config/opencode/config.toml:
+//   [permissions]
+//   questions = ["iconpark-check", "iconpark-naming", "iconpark-category"]
+// 调用时 TUI 自动弹窗,host agent 只需在 YAML frontmatter 标 tool = "question"
+const shape = await tool("question", {
+  prompt: "这个图标实际形状是什么?",
+  options: [
+    "感叹号/警告三角 (推荐)",
+    "水晶+感叹号",
+    "机器人/人形",
+    "其它形状"
+  ]
+})
+```
+
+#### Hermes 实现
+
+```js
+// Hermes — 用 prompt_user 工具
+const shape = await prompt_user({
+  type: "single_select",
+  question: "这个图标实际形状是什么?",
+  options: [
+    {label: "感叹号/警告三角 (推荐)", value: "warn"},
+    {label: "水晶+感叹号", value: "crystal-warn"},
+    {label: "机器人/人形", value: "robot"},
+    {label: "其它形状", value: "other"}
+  ]
+})
+```
+
+#### Gemini CLI 实现
+
+```js
+// Gemini CLI — 用 request_user_input(schema 与 Codex 兼容)
+const shape = await tools.request_user_input({
+  questions: [{
+    question: "这个图标实际形状是什么?",
+    header: "形状",
+    options: [
+      {label: "感叹号/警告三角 (推荐)", description: "单纯警告符号"},
+      {label: "水晶+感叹号", description: "AI 风格的水晶出错图标"},
+      {label: "机器人/人形", description: "类似表情的'困惑/失败'角色"},
+      {label: "其它形状", description: "告诉我具体形状"}
+    ],
+    multiSelect: false
+  }]
+})
+```
+
+> 🛑 **强制约束**:host agent 加载本 skill 时**必须**识别当前 runtime(从 `process.env` / runtime metadata / 配置上下文),然后**只**调用该 runtime 对应的工具。**禁止**"我跑在 Codex 也写 `AskUserQuestion`,让 runtime 自己适配" —— 不同 runtime 工具名/schema 字段(camelCase vs snake_case)都不一样,错位调用直接报错。
+
 > 💡 **优势**:
 > - **认知负担低**:每轮只关注 1 个问题,2-3 秒决策
 > - **上下文精准**:第 N 轮的 options 由第 N-1 轮答案动态生成,选项更相关
@@ -207,6 +302,7 @@ if (svgHasGradientOrMulticolor) {
 - 3. 禁止推荐 `jc-icon-untitled` 作为最终答案（仅作占位）
 - 4. 禁止在分类决策树没命中时硬猜（必须用默认分类 + 标 medium 置信度）
 - 5. **🆕 禁止 host agent 默认采用主推 / 弹完选项自顾自继续**（违反 §🌐 强制约束 #3，必须等用户显式回应）
+- 6. **🆕 禁止"只在 Claude Code 适配弹选项"** —— 跑在 Codex / OpenCode / Hermes / Gemini CLI 时必须用对应 runtime 的工具（违反 §🌐 强制约束 #2 映射表）
 
 ## Skill 的能力边界（重要）
 
