@@ -6,6 +6,37 @@ description: "Use when a designer is preparing an IconPark icon and needs help w
 
 # IconPark 图标设计师助手
 
+## 🌐 强制约束（host agent 必须遵守）
+
+> 这两条是**最高优先级**规则,凌驾于下文所有工作流之上 ——违反任一条 = 执行失败。
+
+### 1. 中文输出(runtime-neutral)
+
+- ✅ **所有 host agent 输出必须中文**:命名推荐、分类理由、置信度说明、检查点问题、修复提示、卡片文案、错误信息。
+- ✅ 例外:**identifier 英文名本身**(`jc-icon-cursor` / `jc-icon-search` 等)和**代码块**保持英文(代码天然是英文)。
+- ❌ 禁止:把推荐理由、问设计师的问题、置信度说明写成英文再让设计师"自己脑补中文"。
+- 实现细节:`AskUserQuestion` 的 `question` / `header` / `options.label` / `options.description` 全部中文。
+
+### 2. 必须弹选项,禁止纯文字自问自答(runtime-neutral)
+
+- ✅ **任何需要设计师决策的点都必须用多选项交互工具弹出 2-4 个互斥选项**,系统会自动提供"其它"兜底(允许自由输入)。
+- ✅ 实现:Claude Code 用 `AskUserQuestion`;其他 runtime 用**等效多选项工具**(`AskUserQuestion` / `request_user_input` / `prompt_user` 等)。
+- ✅ 选项设计原则:
+  - 2-4 个互斥选项
+  - 推荐项在 label 末尾加"(推荐)"
+  - 每次只问 1 个 question(多 question 堆一起违反 §3 多轮动态问题规则)
+- ❌ 禁止:**"请问您想要什么?"** / **"请告诉我您的偏好"** 这种开放式纯文字问法 —— 设计师认知负担重,响应慢。
+- ❌ 禁止:代设计师直接做决定(比如"我推断是 X,继续")而不给选项。
+- 🔴 **CHECKPOINT — 弹选项触发条件**:low 置信度 / badcase 命中 / 业务前缀 / 中文泛词 / 颜色冲突 / 分类歧义,任一命中**必须弹**。
+
+### 决策示例(对照表)
+
+| 场景 | ❌ 错误(纯文字) | ✅ 正确(弹选项) |
+|---|---|---|
+| low 置信度问形状 | "请描述一下这个图标实际长什么样" | `AskUserQuestion({question: "这个图标实际是什么形状?", options: [{label: "感叹号/警告三角 (推荐)"}, ...]})` |
+| 选辅分类 | "这个图标用常规线性还是渐变色?" | `AskUserQuestion({question: "辅分类选哪个?", options: [{label: "常规线性 (推荐)"}, {label: "渐变色"}, {label: "定色"}]})` |
+| 命名有歧义 | "我觉得叫 jc-icon-search,你同意吗?" | `AskUserQuestion({question: "推荐名你接受哪个?", options: [{label: "jc-icon-search (推荐)"}, {label: "jc-icon-magnifier"}, {label: "其它"}]})` |
+
 ## Step-by-Step 设计师交互流程
 
 **host agent 必须按此顺序执行**(每步都有显式输出):
@@ -142,17 +173,22 @@ if (svgHasGradientOrMulticolor) {
 
 > 🔴 **CHECKPOINT — 设计师交互必答三件套**：设计师跟 Skill 对话时，host agent 必须输出三件套：(1) 候选名字(2) 分组(3) 置信度。**只给名字不给置信度 = 没完成**。如果置信度为 low，必须停下来问设计师。
 
-## 不需要做的事
+## 🛑 反例黑名单（host agent 不要做）
+
+> 区分于 §修复模式速查（出错后怎么修），本节是**事前禁止** —— host agent 在推荐前先扫一遍本节，命中即停手。
+
+### 范围外的能力
 
 - ❌ 跟已有图标查重（上传时 IconPark 站内有查重工具）
 - ❌ Figma 插件 / 飞书通知 / 自动同步
 - ❌ **看图识形状** — Skill 只做文本分析。如果给了 `agent点击-2026.svg` 这种"看不出形状"的文件名，Skill 会说"我判断不了"，由 Claude 跟你确认实际形状后给出名字
 
-> 🛑 **STOP 红线（绝对不要做）**：
-> - 1. 禁止基于 SVG 路径数据猜测图标视觉形状
-> - 2. 禁止忽略 `needs_visual_verification=true` 信号直接给最终名字
-> - 3. 禁止推荐 `jc-icon-untitled` 作为最终答案（仅作占位）
-> - 4. 禁止在分类决策树没命中时硬猜（必须用默认分类 + 标 medium 置信度）
+### 🛑 STOP 红线（绝对禁止）
+
+- 1. 禁止基于 SVG 路径数据猜测图标视觉形状
+- 2. 禁止忽略 `needs_visual_verification=true` 信号直接给最终名字
+- 3. 禁止推荐 `jc-icon-untitled` 作为最终答案（仅作占位）
+- 4. 禁止在分类决策树没命中时硬猜（必须用默认分类 + 标 medium 置信度）
 
 ## Skill 的能力边界（重要）
 
@@ -272,7 +308,9 @@ Skill 内部有一份双层关键词决策树（`data/category-decision.json`）
 
 **没识别到的中文**会触发警告，并给出 `jc-icon-untitled` 占位候选 —— 这意味着你需要手动补一个英文名。
 
-## 失败模式速查（host agent 必查）
+## 修复模式速查（host agent 必查）
+
+> 与 §🛑 反例黑名单（事前禁止）配套 —— 本节是**事后修复**。先看反例黑名单避免误操作，再回查本节处理已发生的失败。
 
 | 触发条件 | 一线修复 | 仍失败兜底 |
 |---|---|---|
