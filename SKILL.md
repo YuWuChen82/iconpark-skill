@@ -22,7 +22,7 @@ description: "Use when a designer is preparing an IconPark icon and needs help w
 - ✅ **任何需要设计师决策的点都必须用多选项交互工具弹出 2-4 个互斥选项**,系统会自动提供"其它"兜底(允许自由输入)。
 - ✅ 实现:Claude Code 用 `AskUserQuestion`;其他 runtime 用**等效多选项工具**(`AskUserQuestion` / `request_user_input` / `prompt_user` 等)。
 - ✅ 选项设计原则:
-  - 2-4 个互斥选项
+  - **2-4 个互斥选项**(命名/分类推荐时**至少 2-3 个候选**,避免只给 1 个让设计师无选择)
   - 推荐项在 label 末尾加"(推荐)"
   - 每次只问 1 个 question(多 question 堆一起违反 §3 多轮动态问题规则)
 - ❌ 禁止:**"请问您想要什么?"** / **"请告诉我您的偏好"** 这种开放式纯文字问法 —— 设计师认知负担重,响应慢。
@@ -35,7 +35,7 @@ description: "Use when a designer is preparing an IconPark icon and needs help w
 |---|---|---|
 | low 置信度问形状 | "请描述一下这个图标实际长什么样" | `AskUserQuestion({question: "这个图标实际是什么形状?", options: [{label: "感叹号/警告三角 (推荐)"}, ...]})` |
 | 选辅分类 | "这个图标用常规线性还是渐变色?" | `AskUserQuestion({question: "辅分类选哪个?", options: [{label: "常规线性 (推荐)"}, {label: "渐变色"}, {label: "定色"}]})` |
-| 命名有歧义 | "我觉得叫 jc-icon-search,你同意吗?" | `AskUserQuestion({question: "推荐名你接受哪个?", options: [{label: "jc-icon-search (推荐)"}, {label: "jc-icon-magnifier"}, {label: "其它"}]})` |
+| 命名有歧义 | "我觉得叫 jc-icon-search,你同意吗?" | `AskUserQuestion({question: "推荐名你接受哪个?", options: [{label: "jc-icon-search (推荐)"}, {label: "jc-icon-magnifier"}, {label: "jc-icon-zoom"}]})` |
 
 ## Step-by-Step 设计师交互流程
 
@@ -44,9 +44,9 @@ description: "Use when a designer is preparing an IconPark icon and needs help w
 1. **收输入** — 设计师给 SVG 路径 或 中文描述(可两者)
 2. **读 SVG** — 解析 `<title>` / `<desc>` / 注释 / `data-*` 属性
 3. **算置信度** — `high` / `medium` / `low`(基于 metadata 完整度)
-4. **取名字** — 命中 `assets/goodcase/` 风格 → 输出 `jc-icon-<kebab-case>`;命中 `assets/badcase/` 模式 → 走"剥离业务前缀/剥年份/问形状"流程
-5. **选主分类** — 从 36 官方语义分类(优先 11 高频 + goodcase 分布)推荐 1 个 + 备选
-6. **选辅分类** — 从 7 色彩/样式分类(可空)推荐 1 个
+4. **取名字** — 命中 `assets/goodcase/` 风格 → 输出 **主推 1 个** + **备选 2-3 个** `jc-icon-<kebab-case>`;命中 `assets/badcase/` 模式 → 走"剥离业务前缀/剥年份/问形状"流程,候选同样给 2-3 个
+5. **选主分类** — 从 36 官方语义分类(优先 11 高频 + goodcase 分布)**主推 1 个 + 备选 2-3 个**(共 3-4 个候选,让设计师选)
+6. **选辅分类** — 从 7 色彩/样式分类(可空)**主推 1 个 + 备选 2-3 个**(仅 1 个候选违反本条)
 7. **输出卡片** — 命名 + 主分类 + 辅分类 + 复制粘贴文本
 8. **触发检查点** — `low` 置信度 / badcase 命中 / 业务前缀 → 🔴 必须用"多轮动态问题"问设计师(见下节)
 9. **落库** — 设计师确认后输出最终 `jc-icon-xxx` 写入 IconPark 后台
@@ -229,6 +229,9 @@ if (svgHasGradientOrMulticolor) {
 - **文件名要规范**（Skill 会自动清洗）：
   - ✅ `cursor.svg` / `双星.svg` / `cursor-filled.svg`
   - ❌ `agent点击-2026.svg`（业务前缀 + 年份后缀，Skill 会清洗但置信度会很低）
+- **🔴 推荐命名必须给 2-3 个备选**（不是只给 1 个）：
+  - ✅ 主推 `jc-icon-search` + 备选 `jc-icon-magnifier` / `jc-icon-zoom`
+  - ❌ 只给 1 个候选 `jc-icon-search`（设计师无选择，违反 §🌐 强制约束 #2）
 
 ## goodcase / badcase 学习（host agent 必读）
 
@@ -299,6 +302,8 @@ Skill 维护两套真实案例目录，**host agent 推荐命名/分类前必须
 ```
 
 > 🔴 **CHECKPOINT — 分类必答双件套**:设计师问"该放哪个分类"时,host agent **必须**输出**主分类 + 辅分类**双件套,不能只给一个。命中 badcase 模式时,必须问设计师"实际形状"再定主分类。
+>
+> 🔴 **CHECKPOINT — 分类必须给 2-3 个备选**:主分类**主推 1 个 + 备选 2-3 个**(共 3-4 个候选),辅分类**主推 1 个 + 备选 2-3 个**。单分类候选直接判定为**违反 §🌐 强制约束 #2**。
 
 Skill 内部有一份双层关键词决策树（`data/category-decision.json`），自动匹配。
 
