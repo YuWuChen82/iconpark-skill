@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.join(__dirname, '..', 'data');
+const DATA_DIR = path.join(__dirname, '..', '..', 'assets', 'data');
 
 const NAMING_RE = /^jc-icon-[a-z][a-z0-9-]{1,28}(-lined|-filled|-colored|-gradient)?$/;
 const PREFIX = 'jc-icon-';

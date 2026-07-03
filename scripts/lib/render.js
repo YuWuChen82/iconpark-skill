@@ -135,10 +135,27 @@ export function renderCheckCard({
     lines.push(cardLine(`${color('cyan', '→')} ${truncate(sug, w - 4)}`, 3));
   }
 
-  // 分类结果
+  // 分类结果(双层:主分类 + 辅分类)
   if (categoryResult) {
-    lines.push(cardLine(`${color('green', '✓')} ${color('bold', '分类建议')}  ${color('bold', categoryResult.primary)}`));
-    lines.push(cardLine(`${color('gray', categoryResult.rationale)}`, 3));
+    if (typeof categoryResult === 'object' && categoryResult.primary && typeof categoryResult.primary === 'object') {
+      // v2 双层结构
+      const primaryLabel = categoryResult.primary.primary;
+      const subLabel = categoryResult.sub ? categoryResult.sub.primary : null;
+      const groupLabel = categoryResult.group || (subLabel ? `${primaryLabel} · ${subLabel}` : primaryLabel);
+      lines.push(cardLine(`${color('green', '✓')} ${color('bold', '主分类建议')}  ${color('bold', primaryLabel)}`));
+      lines.push(cardLine(`${color('gray', '  理由: ' + categoryResult.primary.rationale)}`, 3));
+      if (subLabel) {
+        lines.push(cardLine(`${color('green', '✓')} ${color('bold', '辅分类建议')}  ${color('bold', subLabel)}`));
+        lines.push(cardLine(`${color('gray', '  理由: ' + categoryResult.sub.rationale)}`, 3));
+        lines.push(cardLine(`${color('bold', '完整分组: ' + groupLabel)}`));
+      }
+    } else {
+      // v1 兼容（老调用直接传字符串）
+      lines.push(cardLine(`${color('green', '✓')} ${color('bold', '分类建议')}  ${color('bold', String(categoryResult.primary || categoryResult))}`));
+      if (categoryResult.rationale) {
+        lines.push(cardLine(`${color('gray', categoryResult.rationale)}`, 3));
+      }
+    }
   }
 
   // 变体结果

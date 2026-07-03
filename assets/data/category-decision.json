@@ -1,0 +1,118 @@
+{
+  "_doc": "IconPark 双层分类决策树:主分类(36 官方语义,必选) + 辅分类(7 色彩/样式,可空)。匹配采用 substring 包含。基于 goodcase/ 目录反推关键词。",
+  "_primary_categories": [
+    "安全 & 防护", "办公文档", "编辑", "表情", "测量 & 试验",
+    "抽象图形", "电商财产", "动物", "多媒体音乐", "服饰",
+    "符号标识", "工业", "化妆美彩", "几何图形", "建筑",
+    "箭头方向", "交流沟通", "交通旅游", "界面组件", "链接",
+    "美颜调整", "母婴儿童", "能源 & 生命", "品牌", "生活",
+    "时间日期", "食品", "手势动作", "数据", "数据图表",
+    "体育运动", "天气", "星座", "医疗健康", "硬件",
+    "用户人名", "游戏", "其它"
+  ],
+  "_sub_categories": [
+    "常规线性", "高频线性", "填充色", "渐变色",
+    "品牌填充色", "定色", "iconfont 迁移"
+  ],
+  "primary_rules": [
+    {
+      "category": "界面组件",
+      "keywords": ["home", "setting", "menu", "search", "more", "refresh", "save", "tag", "hamburger", "loading", "preview", "all-application", "config", "首页", "设置", "菜单", "搜索", "更多", "刷新", "保存", "标签", "汉堡", "加载", "预览", "全部", "配置"],
+      "rationale": "界面 UI 组件类,goodcase 覆盖最密集(12 个)"
+    },
+    {
+      "category": "编辑",
+      "keywords": ["edit", "delete", "copy", "paste", "cut", "undo", "redo", "zoom", "magnifier", "编辑", "删除", "复制", "撤销", "放大", "缩小"],
+      "rationale": "通用编辑/操作类,goodcase: 删除_delete-two, 放大_zoom-in"
+    },
+    {
+      "category": "表情",
+      "keywords": ["like", "dislike", "smile", "cry", "emotion", "face", "喜欢", "不喜欢", "表情", "笑脸", "爱心", "哭"],
+      "rationale": "情感/表情类,goodcase: 喜欢_like, 不喜欢_dislike"
+    },
+    {
+      "category": "交流沟通",
+      "keywords": ["share", "message", "chat", "notification", "rss", "mail", "comment", "分享", "消息", "聊天", "通知", "订阅", "邮件", "评论"],
+      "rationale": "沟通/分享类,goodcase: 分享_share, 订阅_rss"
+    },
+    {
+      "category": "链接",
+      "keywords": ["link", "bookmark", "url", "anchor", "chain", "链接", "书签", "网址", "锚点"],
+      "rationale": "链接/书签类,goodcase: 书签_bookmark, 书签_bookmark-one"
+    },
+    {
+      "category": "时间日期",
+      "keywords": ["time", "date", "clock", "calendar", "hourglass", "schedule", "时间", "日期", "钟表", "日历", "沙漏", "日程"],
+      "rationale": "时间/日期类,goodcase: 沙漏满_hourglass-full"
+    },
+    {
+      "category": "办公文档",
+      "keywords": ["doc", "file", "folder", "bill", "contract", "pdf", "word", "excel", "文档", "文件", "文件夹", "法案", "合同", "报表"],
+      "rationale": "办公/文档类,goodcase: 法案_bill"
+    },
+    {
+      "category": "多媒体音乐",
+      "keywords": ["pic", "photo", "image", "video", "music", "audio", "equalizer", "speaker", "play", "pause", "照片", "图片", "视频", "音乐", "音频", "均衡器", "扬声器", "播放", "暂停"],
+      "rationale": "媒体/影像/音乐类,goodcase: 照片_pic, 均衡器_equalizer"
+    },
+    {
+      "category": "硬件",
+      "keywords": ["power", "camera", "radar", "aiming", "device", "hardware", "cpu", "chip", "sensor", "开关", "相机", "雷达", "瞄准", "设备", "硬件", "芯片", "传感器"],
+      "rationale": "硬件/设备类,goodcase: 开关_power, 相机_camera, 雷达_radar, 瞄准_aiming"
+    },
+    {
+      "category": "用户人名",
+      "keywords": ["user", "male", "female", "man", "woman", "person", "people", "用户", "男人", "女人", "男性", "女性", "人物", "人名"],
+      "rationale": "用户/人物类,goodcase: 男性_male, 女性_female"
+    },
+    {
+      "category": "天气",
+      "keywords": ["weather", "sun", "cloud", "rain", "snow", "lightning", "thunder", "wind", "天气", "太阳", "云", "雨", "雪", "闪电", "雷", "风"],
+      "rationale": "天气/自然现象类,goodcase: 闪电_lightning"
+    }
+  ],
+  "primary_default": "其它",
+  "sub_rules": [
+    {
+      "category": "常规线性",
+      "keywords": ["info", "warning", "error", "success", "tip", "提示", "信息", "警告", "错误", "成功"],
+      "rationale": "信息提示类按 cc4b 原则属常规线性"
+    },
+    {
+      "category": "常规线性",
+      "keywords": ["arrow", "chevron", "cursor", "pointer", "sparkle", "方向", "箭头", "光标", "指针", "鼠标"],
+      "rationale": "方向/指针类图标"
+    },
+    {
+      "category": "高频线性",
+      "keywords": ["home", "user", "setting", "menu", "close", "plus", "check", "star", "首页", "用户", "设置", "菜单", "关闭", "加", "确认", "星星"],
+      "rationale": "高频使用的基础图标"
+    },
+    {
+      "category": "填充色",
+      "keywords": ["-filled", "filled", "填充"],
+      "rationale": "含 filled 后缀或关键词"
+    },
+    {
+      "category": "渐变色",
+      "keywords": ["-gradient", "gradient", "渐变"],
+      "rationale": "含 gradient 后缀或关键词"
+    },
+    {
+      "category": "品牌填充色",
+      "keywords": ["brand", "logo", "jichuang", "品牌"],
+      "rationale": "品牌专用图标"
+    },
+    {
+      "category": "定色",
+      "keywords": ["-colored", "colored", "彩色", "多色"],
+      "rationale": "多色定色图标(允许彩色)"
+    },
+    {
+      "category": "iconfont 迁移",
+      "keywords": ["iconfont", "migrate", "old", "迁移", "旧"],
+      "rationale": "从 iconfont 迁移的旧图标"
+    }
+  ],
+  "sub_default": "常规线性"
+}
