@@ -1,0 +1,20 @@
+{
+  "name": "iconpark-skill",
+  "version": "0.2.0",
+  "type": "module",
+  "description": "即创 IconPark 图标命名与分组推荐本地 Skill（精简版，无外部依赖）",
+  "bin": {
+    "iconpark": "./bin/iconpark"
+  },
+  "scripts": {
+    "start": "node ./bin/iconpark"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "data/"
+  ]
+}

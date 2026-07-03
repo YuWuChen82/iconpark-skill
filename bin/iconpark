@@ -1,0 +1,332 @@
+#!/usr/bin/env node
+// ~/.claude/skills/iconpark/bin/iconpark
+// CLI 入口：check（SVG → 命名+分类+变体+模板）和 recommend（中文名 → 命名）
+// 新增：--json 输出模式、confidence 计算、needs_visual_verification 信号
+
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const SKILL_ROOT = path.resolve(__dirname, '..');
+
+import {
+  validateIdentifier,
+  recommendIdentifiers,
+  computeConfidence,
+  needsVisualVerification,
+} from '../lib/naming.js';
+import { recommendCategory } from '../lib/category.js';
+import { detectVariants } from '../lib/variant-detect.js';
+import { generateTemplate, identifierFromFilename } from '../lib/template.js';
+import { extractSvgMetadata, suggestIdentifierFromMeta } from '../lib/svg-metadata.js';
+import { renderCheckCard, renderRecommendCard } from '../lib/render.js';
+
+const COMMANDS = {
+  check: cmdCheck,
+  recommend: cmdRecommend,
+  help: cmdHelp,
+};
+
+/**
+ * 主命令 check：必须读取 SVG 文件，从 metadata 推断命名+分类
+ * 支持 --json 输出结构化结果（含 confidence 和 needs_visual_verification）
+ */
+async function cmdCheck(rawArgs) {
+  const { positional, json } = parseCheckArgs(rawArgs);
+  const filePath = positional[0];
+  if (!filePath) {
+    const msg = '用法：iconpark check <file.svg> [--json]';
+    if (json) {
+      console.log(JSON.stringify({ error: msg }));
+    } else {
+      console.log(c('yellow', msg));
+    }
+    process.exit(1);
+  }
+
+  const filename = path.basename(filePath);
+  let svgContent = '';
+  try {
+    svgContent = await fs.readFile(filePath, 'utf8');
+  } catch (e) {
+    const err = `读取文件失败：${e.message}`;
+    if (json) {
+      console.log(JSON.stringify({ error: err, svg_file: filename }));
+    } else {
+      console.log(c('red', `✗ ${err}`));
+    }
+    process.exit(1);
+  }
+
+  // 1) 解析 SVG 内 metadata（title / desc / 注释 / data-*）
+  const meta = extractSvgMetadata(svgContent);
+
+  // 2) 决定 identifier：metadata > 文件名
+  const filenameIdentifier = identifierFromFilename(filename);
+  const suggestion = suggestIdentifierFromMeta(meta, filename);
+  let identifier = filenameIdentifier;
+  let identifierSource = 'filename';
+  let identifierReason = '';
+  if (suggestion.source === 'metadata' && suggestion.identifier) {
+    identifier = `jc-icon-${suggestion.identifier}`.replace(/^jc-icon-jc-icon-/, 'jc-icon-');
+    identifierSource = 'svg-metadata';
+    identifierReason = `SVG 内 metadata 提取到英文名 "${meta.inferredEn}"`;
+  } else if (suggestion.source === 'chinese' && suggestion.chineseName) {
+    // metadata 里只有中文 → 走中文 mapping，给出 best candidate
+    const { candidates } = await recommendIdentifiers(suggestion.chineseName);
+    const best = candidates.find((c) => c.valid) || candidates[0];
+    if (best) {
+      identifier = best.identifier;
+      identifierSource = `svg-metadata-zh: "${suggestion.chineseName}"`;
+      identifierReason = `SVG 内 metadata 提取到中文名 "${suggestion.chineseName}"，映射到 "${best.identifier}"`;
+    }
+  } else {
+    identifierReason = '只能从文件名推断；CLI 仅做文本分析';
+  }
+
+  // 3) 命名校验
+  const namingResult = await validateIdentifier(identifier);
+
+  // 4) 分类：优先用 metadata 中的中文名/英文名推断
+  const categoryHint = meta.inferredZh || meta.inferredEn || identifier;
+  const categoryResult = await recommendCategory(categoryHint);
+
+  // 5) 变体检查
+  const variantResult = detectVariants(svgContent, { category: categoryResult.primary });
+
+  // 6) 置信度计算（核心新增）
+  const confidence = computeConfidence({ filename, meta });
+  const needsVisual = needsVisualVerification(confidence);
+
+  // 7) 决定是否生成粘贴文本（低置信度时抑制，避免给出错的模板）
+  //    注意：identifier=null 表示 CLI 无法确定名字，不是 naming 校验失败
+  const hasVariantErrors = variantResult.issues.some((v) => v.severity === 'error');
+  const hasRealNamingError = namingResult.errors.some((e) => !e.includes('不能为空'));
+  const hasErrors = hasRealNamingError || hasVariantErrors;
+  const template =
+    !hasErrors && confidence !== 'low' && identifier
+      ? generateTemplate({
+          identifier,
+          nameZh: meta.inferredZh || '',
+          nameEn: meta.inferredEn || identifier.replace(/^jc-icon-/, ''),
+          category: categoryResult.primary,
+        })
+      : null;
+
+  // 8) 输出
+  if (json) {
+    const output = buildJsonEnvelope({
+      svg_file: filename,
+      identifier,
+      identifier_source: identifierSource,
+      identifier_reason: identifierReason,
+      confidence,
+      needs_visual_verification: needsVisual,
+      reason: confidenceReason({ filename, meta, confidence }),
+      naming: namingResult,
+      category: categoryResult,
+      variants: variantResult,
+      meta,
+      template,
+    });
+    console.log(JSON.stringify(output, null, 2));
+  } else {
+    console.log(
+      renderCheckCard({
+        svgFile: filename,
+        identifier,
+        identifierSource,
+        confidence,
+        reason: confidenceReason({ filename, meta, confidence }),
+        nameZh: meta.inferredZh || '',
+        nameEn: meta.inferredEn || identifier.replace(/^jc-icon-/, ''),
+        category: categoryResult.primary,
+        namingResult,
+        categoryResult,
+        variantResult,
+        meta,
+        template,
+      })
+    );
+  }
+
+  // 9) 退出码
+  if (hasErrors) {
+    process.exit(1);
+  }
+  if (json && needsVisual) {
+    // JSON 模式下用 exit 2 标识 "needs_visual_verification"（medium + low 都算）
+    process.exit(2);
+  }
+}
+
+/**
+ * 主命令 recommend：根据中文名推荐 identifier
+ */
+async function cmdRecommend(args) {
+  const chineseName = args[0];
+  const category = args[1];
+  if (!chineseName) {
+    console.log(c('yellow', '用法：iconpark recommend <中文名> [分类]'));
+    console.log('  例：iconpark recommend 双星');
+    console.log('  例：iconpark recommend 闪光 常规线性');
+    process.exit(1);
+  }
+
+  const { candidates, unrecognized } = await recommendIdentifiers(chineseName, category);
+  console.log(renderRecommendCard({ chineseName, candidates, unrecognized, category }));
+}
+
+async function cmdHelp() {
+  console.log(`
+${c('bold', 'IconPark 本地 Skill（精简版）')}
+
+${c('bold', '用法：')}
+  iconpark <command> [args...]
+
+${c('bold', '命令：')}
+  check <file.svg> [--json]    检查 SVG：metadata 推断 + 变体检查
+  recommend <中文名> [分类]     根据中文名推荐 identifier
+  help                          显示此帮助
+
+${c('bold', 'check 输出：')}
+  · 默认：彩色卡片，标识置信度（high/medium/low）
+  · --json：结构化 JSON，含 needs_visual_verification 信号
+
+${c('bold', 'check 会读取 SVG 中的：')}
+  · <title> / <desc>
+  · <!-- 注释 -->（含中文名/分组）
+  · data-name / data-zh / data-en 属性
+
+${c('bold', '置信度规则：')}
+  high:   metadata 里有明确英文名 / 中文名且全部命中 ZH_MAPPING
+  medium: 文件名清洗后剩余 token 但无法验证 shape 语义
+  low:    文件名含年份/版本/项目前缀，或完全无 metadata
+
+${c('bold', '示例：')}
+  iconpark check icons/my-icon.svg
+  iconpark check icons/my-icon.svg --json
+  iconpark recommend 光标
+`);
+}
+
+function parseCheckArgs(rawArgs) {
+  try {
+    const parsed = parseArgs({
+      args: rawArgs,
+      options: {
+        json: { type: 'boolean', default: false },
+      },
+      strict: true,
+      allowPositionals: true,
+    });
+    return { positional: parsed.positionals, json: parsed.values.json };
+  } catch (e) {
+    // --json 拼错等情况
+    return { positional: rawArgs, json: false };
+  }
+}
+
+/**
+ * 构造 JSON 信封
+ */
+function buildJsonEnvelope(data) {
+  return {
+    svg_file: data.svg_file,
+    identifier: data.identifier,
+    identifier_source: data.identifier_source,
+    identifier_reason: data.identifier_reason,
+    confidence: data.confidence,
+    needs_visual_verification: data.needs_visual_verification,
+    reason: data.reason,
+    naming: {
+      ok: data.naming.ok,
+      errors: data.naming.errors,
+      warnings: data.naming.warnings,
+      suggestions: data.naming.suggestions,
+    },
+    category: {
+      primary: data.category.primary,
+      alternatives: data.category.alternatives,
+      rationale: data.category.rationale,
+    },
+    variants: {
+      issues: data.variants.issues,
+    },
+    meta: {
+      title: data.meta.title,
+      desc: data.meta.desc,
+      data_name: data.meta.dataName,
+      data_zh: data.meta.dataZh,
+      data_en: data.meta.dataEn,
+      inferred_zh: data.meta.inferredZh,
+      inferred_en: data.meta.inferredEn,
+      comments: data.meta.comments,
+    },
+    template: data.template,
+  };
+}
+
+/**
+ * 给置信度一个简短的"为什么"，方便 JSON 消费者定位
+ * 通用化：不绑定特定 host 实现，只描述"为什么 CLI 给这个 confidence"
+ */
+function confidenceReason({ filename, meta, confidence }) {
+  if (confidence === 'high') {
+    if (meta?.inferredEn) return `SVG metadata 提取到英文名 "${meta.inferredEn}"`;
+    if (meta?.inferredZh) return `SVG metadata 提取到中文名 "${meta.inferredZh}" 且命中 ZH_MAPPING`;
+    return '文件名命中 ZH_MAPPING';
+  }
+  if (confidence === 'medium') {
+    if (filename && /[一-龥]/.test(filename)) {
+      return '文件名含中文且命中 ZH_MAPPING，但仅靠文件名无法验证 shape 语义';
+    }
+    return '文件名清洗后剩余 token，仅靠文件名无法验证 shape 语义';
+  }
+  // low
+  if (!meta?.inferredZh && !meta?.inferredEn && /[-_](19|20)\d{2}$/.test(filename)) {
+    return `文件名含年份后缀，无法判断图标实际语义`;
+  }
+  if (!meta?.inferredZh && !meta?.inferredEn && /[-_](v\d|final|副本)/i.test(filename)) {
+    return `文件名含版本/状态后缀`;
+  }
+  if (filename && /[一-龥]/.test(filename)) {
+    return '文件名含未识别中文，CLI 无法推断';
+  }
+  if (!meta?.inferredZh && !meta?.inferredEn) {
+    return 'SVG 无 metadata，文件名无法识别 shape 语义';
+  }
+  return '置信度低';
+}
+
+function c(color, s) {
+  const codes = { reset: 0, bold: 1, dim: 2, green: 32, yellow: 33, red: 31, cyan: 36, gray: 90, magenta: 35, blue: 34 };
+  return `\x1b[${codes[color] || 0}m${s}\x1b[0m`;
+}
+
+async function main() {
+  const [cmd, ...args] = process.argv.slice(2);
+  if (!cmd) {
+    await cmdHelp();
+    return;
+  }
+  const handler = COMMANDS[cmd];
+  if (!handler) {
+    console.log(c('red', `未知命令：${cmd}`));
+    console.log(`运行 ${c('cyan', 'iconpark help')} 查看帮助`);
+    process.exit(1);
+  }
+  try {
+    await handler(args);
+  } catch (e) {
+    console.error(c('red', `✗ 错误：${e.message}`));
+    if (process.env.DEBUG) {
+      console.error(e.stack);
+    }
+    process.exit(1);
+  }
+}
+
+main();

@@ -1,0 +1,125 @@
+{
+  "_doc": "反例词典：场景化命名 → 按形状/通用功能命名。每条都是 [bad, good, reason]。",
+  "examples": [
+    {
+      "bad": "jc-icon-tips-popup",
+      "good": "jc-icon-info",
+      "reason": "tips-popup 是使用场景，info 是形状/通用功能。后续在 inform 等场景也能复用。"
+    },
+    {
+      "bad": "jc-icon-previous",
+      "good": "jc-icon-arrow-left-double",
+      "reason": "previous 是场景（翻页），按形状命名为双左箭头。"
+    },
+    {
+      "bad": "jc-icon-next",
+      "good": "jc-icon-arrow-right-double",
+      "reason": "同上。"
+    },
+    {
+      "bad": "jc-icon-success-toast",
+      "good": "jc-icon-check-circle-filled",
+      "reason": "success-toast 是场景，check-circle 是形状 + 形态。"
+    },
+    {
+      "bad": "jc-icon-fail-close",
+      "good": "jc-icon-close-circle-filled",
+      "reason": "fail-close 是场景，按形状命名。"
+    },
+    {
+      "bad": "jc-icon-warning-sign",
+      "good": "jc-icon-warning-filled",
+      "reason": "warning-sign 是冗余（warning 本身就是警示牌）。"
+    },
+    {
+      "bad": "jc-icon-error-page",
+      "good": "jc-icon-warning-triangle",
+      "reason": "error-page 是场景。"
+    },
+    {
+      "bad": "jc-icon-loading-spinner",
+      "good": "jc-icon-loading",
+      "reason": "spinner 是形状细节，loading 即可。"
+    },
+    {
+      "bad": "jc-icon-menu-button",
+      "good": "jc-icon-menu",
+      "reason": "button 是 UI 容器，与 icon 本体无关。"
+    },
+    {
+      "bad": "jc-icon-home-tab",
+      "good": "jc-icon-home",
+      "reason": "tab 是位置，home 是形状/功能。"
+    },
+    {
+      "bad": "jc-icon-user-avatar",
+      "good": "jc-icon-user",
+      "reason": "avatar 是使用场景，user 即可。"
+    },
+    {
+      "bad": "jc-icon-search-bar",
+      "good": "jc-icon-search",
+      "reason": "bar 是 UI 容器。"
+    },
+    {
+      "bad": "jc-icon-settings-gear",
+      "good": "jc-icon-setting",
+      "reason": "gear 是形状细节，setting 是通用功能。"
+    },
+    {
+      "bad": "jc-icon-edit-pencil",
+      "good": "jc-icon-edit",
+      "reason": "pencil 是形状细节，edit 是功能。"
+    },
+    {
+      "bad": "jc-icon-delete-trash",
+      "good": "jc-icon-delete",
+      "reason": "trash 是形状细节，delete 是功能。"
+    },
+    {
+      "bad": "jc-icon-notification-bell",
+      "good": "jc-icon-notification",
+      "reason": "bell 是形状细节，notification 是功能。"
+    },
+    {
+      "bad": "jc-icon-message-bubble",
+      "good": "jc-icon-message",
+      "reason": "bubble 是形状细节。"
+    },
+    {
+      "bad": "jc-icon-cart-shopping",
+      "good": "jc-icon-shopping-cart",
+      "reason": "shopping-cart 是行业通用命名。"
+    },
+    {
+      "bad": "jc-icon-heart-favorite",
+      "good": "jc-icon-like",
+      "reason": "favorite 与 like 同义，按团队常用命名。"
+    },
+    {
+      "bad": "jc-icon-agent-click",
+      "good": "jc-icon-cursor",
+      "reason": "agent 是场景前缀，应去业务化。"
+    },
+    {
+      "bad": "jc-icon-cursor-2026",
+      "good": "jc-icon-cursor",
+      "reason": "年份后缀无意义，应在 filename 清洗阶段去掉。"
+    },
+    {
+      "bad": "jc-icon-click-hand",
+      "good": "jc-icon-cursor",
+      "reason": "click-hand 是冗余组合，cursor 已涵盖手势点击语义。"
+    },
+    {
+      "bad": "jc-icon-mouse-arrow",
+      "good": "jc-icon-cursor",
+      "reason": "mouse-arrow 双重修饰，cursor 是行业通用命名。"
+    },
+    {
+      "bad": "jc-icon-cursor-pointer",
+      "good": "jc-icon-cursor",
+      "reason": "cursor-pointer 同义重复。"
+    }
+  ]
+}

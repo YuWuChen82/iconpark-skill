@@ -1,0 +1,62 @@
+{
+  "_doc": "分类决策树：用于根据 identifier / 中文名自动推荐分组。匹配采用 substring 包含。",
+  "categories": ["常规线性", "高频线性", "填充色", "渐变色", "品牌填充色", "定色", "iconfont 迁移"],
+  "rules": [
+    {
+      "category": "常规线性",
+      "keywords": ["info", "warning", "error", "success", "tip", "提示", "信息", "警告", "错误", "成功"],
+      "rationale": "信息提示类按 cc4b 原则属常规线性"
+    },
+    {
+      "category": "常规线性",
+      "keywords": ["edit", "delete", "copy", "paste", "cut", "undo", "redo", "sparkle", "编辑", "删除", "复制", "撤销", "闪光", "点缀"],
+      "rationale": "通用编辑/装饰操作类"
+    },
+    {
+      "category": "常规线性",
+      "keywords": ["arrow", "chevron", "cursor", "pointer", "方向", "箭头", "光标", "指针", "鼠标", "上", "下", "左", "右"],
+      "rationale": "方向/指针类图标"
+    },
+    {
+      "category": "常规线性",
+      "keywords": ["search", "filter", "sort", "搜索", "筛选", "排序"],
+      "rationale": "通用 UI 类"
+    },
+    {
+      "category": "常规线性",
+      "keywords": ["shopping", "shop", "product", "order", "payment", "购物车", "购物袋", "店铺", "商品", "奖杯", "勋章", "火箭", "礼物"],
+      "rationale": "商务 / 装饰类图标"
+    },
+    {
+      "category": "高频线性",
+      "keywords": ["home", "user", "setting", "menu", "close", "plus", "check", "star", "like", "首页", "用户", "设置", "菜单", "关闭", "加", "确认", "星星", "星形", "收藏", "点赞", "赞"],
+      "rationale": "高频使用的基础图标"
+    },
+    {
+      "category": "填充色",
+      "keywords": ["-filled", "filled", "填充"],
+      "rationale": "含 filled 后缀或关键词"
+    },
+    {
+      "category": "渐变色",
+      "keywords": ["-gradient", "gradient", "渐变"],
+      "rationale": "含 gradient 后缀或关键词"
+    },
+    {
+      "category": "品牌填充色",
+      "keywords": ["brand", "logo", "jichuang", "品牌", "logo"],
+      "rationale": "品牌专用图标"
+    },
+    {
+      "category": "定色",
+      "keywords": ["-colored", "colored", "彩色", "多色"],
+      "rationale": "多色定色图标（允许彩色）"
+    },
+    {
+      "category": "iconfont 迁移",
+      "keywords": ["iconfont", "migrate", "old", "迁移", "旧"],
+      "rationale": "从 iconfont 迁移的旧图标"
+    }
+  ],
+  "default_category": "常规线性"
+}

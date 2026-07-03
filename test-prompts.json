@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1,
+    "prompt": "帮我 check 一下 icons/cursor.svg 这个 SVG,该叫什么名字、放哪个分组、有什么问题要改",
+    "expected": "输出标准卡片:推荐名 jc-icon-cursor、归类常规线性、列出 SVG 质量检查结果(若有问题)",
+    "scenario": "happy path - 命名规范的 SVG,只需标准三件套(命名+分类+质量检查)"
+  },
+  {
+    "id": 2,
+    "prompt": "我想做一个双星图标,推荐个英文名",
+    "expected": "根据中文映射表给 1-2 个候选名,首选 jc-icon-star",
+    "scenario": "happy path - 纯命名场景,无 SVG 文件"
+  },
+  {
+    "id": 3,
+    "prompt": "这个 SVG 该怎么处理?文件名是 agent点击-2026.svg,内容是一颗星星",
+    "expected": "清洗文件名(去年份/业务前缀)→ 置信度低 → 输出 needs_visual_verification 信号 → 提示让用户确认形状",
+    "scenario": "歧义场景 - 文件名不规范但用户描述了形状,Skill 应能结合用户描述给出高置信度结果"
+  }
+]
