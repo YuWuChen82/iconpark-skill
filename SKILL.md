@@ -35,8 +35,8 @@ const shape = await AskUserQuestion({
     options: [
       {label: "感叹号/警告三角 (推荐)", description: "单纯警告符号"},
       {label: "水晶+感叹号", description: "AI 风格的水晶出错图标"},
-      {label: "机器人/人形", description: "类似表情的'困惑/失败'角色"},
-      {label: "其它形状", description: "告诉我具体形状"}
+      {label: "机器人/人形", description: "类似表情的'困惑/失败'角色"}
+      // "其它"由系统兜底,不需要列
     ],
     multiSelect: false
   }]
@@ -52,8 +52,7 @@ const shape = await tools.request_user_input({
     options: [
       {label: "感叹号/警告三角 (推荐)", description: "单纯警告符号"},
       {label: "水晶+感叹号", description: "AI 风格的水晶出错图标"},
-      {label: "机器人/人形", description: "类似表情的'困惑/失败'角色"},
-      {label: "其它形状", description: "告诉我具体形状"}
+      {label: "机器人/人形", description: "类似表情的'困惑/失败'角色"}
     ],
     multi_select: false
   }]
@@ -67,8 +66,7 @@ const shape = await ask_followup_question({
   options: [
     {label: "感叹号/警告三角 (推荐)", description: "单纯警告符号", preview: "⚠️"},
     {label: "水晶+感叹号", description: "AI 风格的水晶出错图标"},
-    {label: "机器人/人形", description: "类似表情的'困惑/失败'角色"},
-    {label: "其它形状", description: "告诉我具体形状"}
+    {label: "机器人/人形", description: "类似表情的'困惑/失败'角色"}
   ]
 })
 ```
@@ -80,8 +78,7 @@ const shape = await ask_user({
   options: [
     "感叹号/警告三角 (推荐)",
     "水晶+感叹号",
-    "机器人/人形",
-    "其它形状"
+    "机器人/人形"
   ]
 })
 ```
@@ -97,7 +94,6 @@ options:
   - 感叹号/警告三角 (推荐)
   - 水晶+感叹号
   - 机器人/人形
-  - 其它形状
 ```
 
 - 🛑 **强制约束**:host agent 加载本 skill 时**必须**识别当前 agent(从 `process.env` / agent metadata / 配置上下文),**只**调用该 agent 的原生工具。**禁止**"我跑在 Cline 也写 `AskUserQuestion`" —— 错位调用直接报错。
@@ -107,37 +103,28 @@ options:
 
 > 🔴 **降级条件**:Agent **没有** §路径 A 任何原生工具(例如 Codex CLI default 模式未启用 `experimental_request_user_input`、纯命令行 REPL Agent、IDE 内联聊天等)。此时 host agent **必须**走纯文字编号列表 + 强制等待协议。
 
-#### B.1 输出格式(用编号列表提问)
+#### B.1 输出格式(简洁编号列表,无装饰)
 
 ```text
-═══════════════════════════════════════
-⏸  host agent 必须停在这里等设计师回应
-═══════════════════════════════════════
+请告诉我这个图标的实际形状(回数字即可):
 
-[1] 感叹号/警告三角 (推荐)
-    → 单纯警告符号
-[2] 水晶+感叹号
-    → AI 风格的水晶出错图标
-[3] 机器人/人形
-    → 类似表情的'困惑/失败'角色
-[4] 其它形状
-    → 告诉我具体形状
+[1] 感叹号/警告三角 (推荐)  — 单纯警告符号
+[2] 水晶+感叹号              — AI 风格的水晶出错图标
+[3] 机器人/人形              — 类似表情的'困惑/失败'角色
 
-请回复 1 / 2 / 3 / 4 之一,或自由描述。
+(系统自动提供'其它'自由输入)
 
-⚠️ host agent 输出到此为止 — 不要继续输出任何内容
-   (包括"我先按 [1] 继续"等)
-═══════════════════════════════════════
+host agent 停在这里等回应 — 不要继续输出。
 ```
 
 #### B.2 等待与重试协议
 
 | 轮次 | host agent 行为 | 输出 |
 |---|---|---|
-| **第 1 轮** | 纯文字编号列表 + ⏸ 显式等待标识 | 见 B.1 |
-| **第 2 轮**(用户没回应) | 重新输出 + "上一轮我在等你"提示 | 同 B.1 加注 |
-| **第 3 轮**(还没回应) | 升级 + 显式退出选项 `0=跳过 / free=自由描述` | 同 B.1 加 `[0]` `[free]` |
-| **第 4 轮:超时** | 报错 + 终止 + 提示切换到有原生工具的 agent | 流程中断 |
+| **第 1 轮** | 纯文字编号列表 | 见 B.1 |
+| **第 2 轮**(用户没回应) | 重新输出,提示"上一轮我在等" | 同 B.1 |
+| **第 3 轮**(还没回应) | 升级 + 显式退出选项 | 同 B.1,加 `[0]` `[free]` |
+| **第 4 轮:超时** | 报错 + 终止,提示切换 agent | 流程中断 |
 
 > 🛑 **强制约束**:**3 轮还没回应必须报超时**,**禁止** host agent 在 4 阶段自动"我推断用户沉默 = 同意主推"——这是**逃避决策**,违反 §🌐 强制约束 #3。
 
@@ -184,11 +171,8 @@ options:
 #### A.1 预分析卡片(必输出,先于弹选项)
 
 ```text
-═══════════════════════════════════════
 📋 预分析卡片 — 读 SVG 后(节点 A)
-═══════════════════════════════════════
 
-项目          | 内容
 文件          | /path/to/icon.svg
 badcase 命中  | ✅/❌(具体类型)
 清洗后        | (业务前缀/位置/年份已剥离后的内容)
@@ -196,7 +180,6 @@ SVG 实际形状  | (从 8 渠道推断:viewBox、g id、d 命令关键字等)
 置信度        | high/medium/low
 主分类预判    | 候选 1 (推荐) / 候选 2 / 候选 3
 辅分类预判    | 候选 1 (推荐) / 候选 2 / 候选 3
-═══════════════════════════════════════
 ```
 
 #### A.2 弹选项(基于预分析)
@@ -208,8 +191,7 @@ AskUserQuestion({
     header: "预分析确认",
     options: [
       {label: "完全对,按预分析继续 (推荐)", description: "命名/分类预判都接受,直接进入步骤 4"},
-      {label: "形状预判有误", description: "我重新看 path/group 给你修正"},
-      {label: "分类预判有误", description: "我看你心里有别的分类,告诉我"},
+      {label: "形状/分类预判有误", description: "我重新看 path/group 给你修正"},
       {label: "我直接补充信息", description: "用自由文本告诉我关键信息"}
     ],
     multiSelect: false
@@ -243,7 +225,6 @@ AskUserQuestion({
     options: [
       {label: "是一个光标 (推荐)", description: "剥离后是 cursor/clicking"},
       {label: "是一个按钮", description: "剥离后是 button"},
-      {label: "其它形状", description: "我补充具体形状"},
       {label: "前缀不是业务用的,保留", description: "就是叫 agent-xxx"}
     ],
     multiSelect: false
@@ -258,7 +239,6 @@ AskUserQuestion({
     options: [
       {label: "收起图标 (推荐)", description: "箭头向下"},
       {label: "展开图标", description: "箭头向右"},
-      {label: "关闭图标", description: "X 符号"},
       {label: "其它", description: "我补充"}
     ],
     multiSelect: false
@@ -273,8 +253,7 @@ AskUserQuestion({
     options: [
       {label: "柱状图 (推荐)", description: "bar chart"},
       {label: "饼图", description: "pie chart"},
-      {label: "折线图", description: "line chart"},
-      {label: "表格", description: "table"}
+      {label: "折线图", description: "line chart"}
     ],
     multiSelect: false
   }]
@@ -304,8 +283,7 @@ AskUserQuestion({
     options: [
       {label: "jc-icon-sparkle (推荐)", description: "最常用,IconPark 主流命名"},
       {label: "jc-icon-flash", description: "强调瞬间效果"},
-      {label: "jc-icon-twinkle", description: "强调闪烁感"},
-      {label: "我自己起一个", description: "用 free 自由输入"}
+      {label: "jc-icon-twinkle", description: "强调闪烁感"}
     ],
     multiSelect: false
   }]
@@ -334,7 +312,6 @@ AskUserQuestion({
     options: [
       {label: "硬件 (推荐)", description: "物理开关感,IconPark 原始归类"},
       {label: "界面组件", description: "UI 上的开关按钮"},
-      {label: "符号标识", description: "通用 on/off 符号"},
       {label: "其它分类", description: "用 free 告诉我"}
     ],
     multiSelect: false
@@ -356,8 +333,7 @@ AskUserQuestion({
     options: [
       {label: "渐变色 (推荐)", description: "保留现有 linearGradient/radialGradient"},
       {label: "定色(多色)", description: "渐变替换为具体色值 #28FFEF 等"},
-      {label: "常规线性", description: "去掉渐变,改单色描边"},
-      {label: "跳过(可空)", description: "本图标不需要辅分类"}
+      {label: "常规线性", description: "去掉渐变,改单色描边"}
     ],
     multiSelect: false
   }]
@@ -379,8 +355,7 @@ AskUserQuestion({
     options: [
       {label: "感叹号/警告三角 (推荐)", description: "单纯警告符号"},
       {label: "水晶+感叹号", description: "AI 风格的水晶出错图标"},
-      {label: "机器人/人形", description: "类似表情的'困惑/失败'角色"},
-      {label: "其它形状", description: "用 free 告诉我具体形状"}
+      {label: "机器人/人形", description: "类似表情的'困惑/失败'角色"}
     ],
     multiSelect: false
   }]
@@ -395,9 +370,7 @@ AskUserQuestion({
 #### G.1 最终卡片(必输出,先于弹选项)
 
 ```text
-═══════════════════════════════════════
 ✅ 最终结果(待确认)
-═══════════════════════════════════════
 
 identifier : jc-icon-sparkle
 主分类     : 界面组件
@@ -407,7 +380,6 @@ identifier : jc-icon-sparkle
 
 📋 复制粘贴文本:
 jc-icon-sparkle · 界面组件 · 渐变色
-═══════════════════════════════════════
 ```
 
 #### G.2 弹选项
@@ -419,8 +391,7 @@ AskUserQuestion({
     header: "最终确认",
     options: [
       {label: "确认落库 (推荐)", description: "复制粘贴文本后写入 IconPark 后台"},
-      {label: "改命名", description: "回节点 C 重新选"},
-      {label: "改分类", description: "回节点 D 重新选"},
+      {label: "改命名/分类", description: "回节点 C/D 重新选"},
       {label: "暂停(我不确定)", description: "暂存草稿,稍后再看"}
     ],
     multiSelect: false
@@ -469,9 +440,9 @@ AskUserQuestion({
 
 ### 2. 必须弹选项,禁止纯文字自问自答(runtime-neutral)
 
-- ✅ **任何需要设计师决策的点都必须用多选项交互工具弹出 2-4 个互斥选项**,系统会自动提供"其它"兜底(允许自由输入)。
+- ✅ **任何需要设计师决策的点都必须用多选项交互工具弹出 2-3 个互斥选项**,系统会自动提供"其它"兜底(允许自由输入)。
 - ✅ 选项设计原则:
-  - **2-4 个互斥选项**(命名/分类推荐时**至少 2-3 个候选**,避免只给 1 个让设计师无选择)
+  - **2-3 个互斥选项**(命名/分类推荐时**至少 2-3 个候选**,避免只给 1 个让设计师无选择)
   - 推荐项在 label 末尾加"(推荐)"
   - 每次只问 1 个 question(多 question 堆一起违反 §3 多轮动态问题规则)
 - ❌ 禁止:**"请问您想要什么?"** / **"请告诉我您的偏好"** 这种开放式纯文字问法 —— 设计师认知负担重,响应慢。
@@ -687,7 +658,7 @@ AskUserQuestion({
 | 字段 | 含义 |
 |---|---|
 | `question` | 当轮的提问(根据上一轮答案动态生成) |
-| `options` | 2-4 个互斥选项(根据上一轮答案的分支动态生成) |
+| `options` | 2-3 个互斥选项(根据上一轮答案的分支动态生成) |
 | 推荐项 | 在 label 末尾加 "(推荐)" |
 | 兜底项 | "其它" — 设计师自由输入 |
 
