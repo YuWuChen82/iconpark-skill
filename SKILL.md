@@ -6,6 +6,157 @@ description: "Use when a designer is preparing an IconPark icon and needs help w
 
 # IconPark 图标设计师助手
 
+## 询问用户选择
+
+> **核心问题**:host agent 在不同 agent 环境(Claude Code / Codex / Cline / Copilot / OpenCode 等)需要用对应工具让设计师做选择。本章是 **§🌐 强制约束 #2** 的落地执行层,按 Agent 能力分两路。
+
+### 路径 A:有原生多选项工具(优先)
+
+> ✅ **首选方案**:Agent 提供原生多选项工具时,host agent **必须**调用对应工具,这是 §🌐 强制约束 #2 的标准实现。
+
+| Agent | 原生工具 | 启用方式 | 备注 |
+|---|---|---|---|
+| **Claude Code** | `AskUserQuestion` | 内置,直接调用 | 详见 §Claude Code 实现示例 |
+| **Codex CLI** | `request_user_input` | 需在 `~/.codex/config.toml` 启用 `experimental_request_user_input = true` | 官方 commit `e0435af` 2026-06-05 合入;不启用就走路径 B |
+| **Cline / Roo Code** | `ask_followup_question` | 内置 | VS Code 扩展生态,选项数组格式 |
+| **GitHub Copilot** | `ask_user` | 内置 | GitHub Copilot Chat / Workspace |
+| **OpenCode** | TUI 内置 `question` 工具 | 通过 `permissions.questions` 配置 | TUI 风格,host agent 在 YAML frontmatter 标 `tool: "question"` |
+| **Hermes** | `prompt_user` | 内置 | 通用多选 prompt |
+| **Gemini CLI** | `request_user_input` | 内置 | 复用 Codex 兼容 schema |
+
+调用示例(各 agent 一段):
+
+```js
+// Claude Code
+const shape = await AskUserQuestion({
+  questions: [{
+    question: "这个图标实际形状是什么?",
+    header: "形状",
+    options: [
+      {label: "感叹号/警告三角 (推荐)", description: "单纯警告符号"},
+      {label: "水晶+感叹号", description: "AI 风格的水晶出错图标"},
+      {label: "机器人/人形", description: "类似表情的'困惑/失败'角色"},
+      {label: "其它形状", description: "告诉我具体形状"}
+    ],
+    multiSelect: false
+  }]
+})
+```
+
+```js
+// Codex CLI(snake_case)
+const shape = await tools.request_user_input({
+  questions: [{
+    question: "这个图标实际形状是什么?",
+    header: "形状",
+    options: [
+      {label: "感叹号/警告三角 (推荐)", description: "单纯警告符号"},
+      {label: "水晶+感叹号", description: "AI 风格的水晶出错图标"},
+      {label: "机器人/人形", description: "类似表情的'困惑/失败'角色"},
+      {label: "其它形状", description: "告诉我具体形状"}
+    ],
+    multi_select: false
+  }]
+})
+```
+
+```js
+// Cline / Roo Code
+const shape = await ask_followup_question({
+  question: "这个图标实际形状是什么?",
+  options: [
+    {label: "感叹号/警告三角 (推荐)", description: "单纯警告符号", preview: "⚠️"},
+    {label: "水晶+感叹号", description: "AI 风格的水晶出错图标"},
+    {label: "机器人/人形", description: "类似表情的'困惑/失败'角色"},
+    {label: "其它形状", description: "告诉我具体形状"}
+  ]
+})
+```
+
+```js
+// GitHub Copilot
+const shape = await ask_user({
+  question: "这个图标实际形状是什么?",
+  options: [
+    "感叹号/警告三角 (推荐)",
+    "水晶+感叹号",
+    "机器人/人形",
+    "其它形状"
+  ]
+})
+```
+
+```js
+// OpenCode(TUI 风格,YAML frontmatter)
+---
+tool: question
+description: 询问设计师选择
+---
+prompt: 这个图标实际形状是什么?
+options:
+  - 感叹号/警告三角 (推荐)
+  - 水晶+感叹号
+  - 机器人/人形
+  - 其它形状
+```
+
+- 🛑 **强制约束**:host agent 加载本 skill 时**必须**识别当前 agent(从 `process.env` / agent metadata / 配置上下文),**只**调用该 agent 的原生工具。**禁止**"我跑在 Cline 也写 `AskUserQuestion`" —— 错位调用直接报错。
+- ❌ **禁止绕过路径 A 走路径 B**:即使你"觉得路径 B 简单",原生工具可用时**必须**优先用。
+
+### 路径 B:无原生工具(降级方案)
+
+> 🔴 **降级条件**:Agent **没有** §路径 A 任何原生工具(例如 Codex CLI default 模式未启用 `experimental_request_user_input`、纯命令行 REPL Agent、IDE 内联聊天等)。此时 host agent **必须**走纯文字编号列表 + 强制等待协议。
+
+#### B.1 输出格式(用编号列表提问)
+
+```text
+═══════════════════════════════════════
+⏸  host agent 必须停在这里等设计师回应
+═══════════════════════════════════════
+
+[1] 感叹号/警告三角 (推荐)
+    → 单纯警告符号
+[2] 水晶+感叹号
+    → AI 风格的水晶出错图标
+[3] 机器人/人形
+    → 类似表情的'困惑/失败'角色
+[4] 其它形状
+    → 告诉我具体形状
+
+请回复 1 / 2 / 3 / 4 之一,或自由描述。
+
+⚠️ host agent 输出到此为止 — 不要继续输出任何内容
+   (包括"我先按 [1] 继续"等)
+═══════════════════════════════════════
+```
+
+#### B.2 等待与重试协议
+
+| 轮次 | host agent 行为 | 输出 |
+|---|---|---|
+| **第 1 轮** | 纯文字编号列表 + ⏸ 显式等待标识 | 见 B.1 |
+| **第 2 轮**(用户没回应) | 重新输出 + "上一轮我在等你"提示 | 同 B.1 加注 |
+| **第 3 轮**(还没回应) | 升级 + 显式退出选项 `0=跳过 / free=自由描述` | 同 B.1 加 `[0]` `[free]` |
+| **第 4 轮:超时** | 报错 + 终止 + 提示切换到有原生工具的 agent | 流程中断 |
+
+> 🛑 **强制约束**:**3 轮还没回应必须报超时**,**禁止** host agent 在 4 阶段自动"我推断用户沉默 = 同意主推"——这是**逃避决策**,违反 §🌐 强制约束 #3。
+
+#### B.3 与路径 A 的关键差异
+
+| 维度 | 路径 A(原生工具) | 路径 B(降级纯文字) |
+|---|---|---|
+| 工具调用 | ✅ 必须调 `AskUserQuestion` 等 | ❌ 不调工具,纯文字 |
+| 等待机制 | 工具自动阻塞等用户 | 靠 ⏸ 标识 + 硬约束 |
+| 重试协议 | 工具自带超时 | 4 阶段轮询 |
+| 退出选项 | 工具提供"其它" | 显式 `[0]` `[free]` 编号 |
+| 失败兜底 | 工具报错 host agent 看到 | 阶段 4 报超时终止 |
+
+> 💡 **如何选择路径**:
+> - host agent 启动时**先检查**当前 agent 有没有原生工具(查 §路径 A 表格)
+> - **有 → 路径 A**(强制)
+> - **没有 → 路径 B**(必须按 4 阶段轮询)
+> - **不要混用**:有原生工具却走纯文字 = 违反 §🌐 强制约束 #2
+
 ## 🌐 强制约束（host agent 必须遵守）
 
 > 这两条是**最高优先级**规则,凌驾于下文所有工作流之上 ——违反任一条 = 执行失败。
@@ -27,22 +178,9 @@ description: "Use when a designer is preparing an IconPark icon and needs help w
 - ❌ 禁止:**"请问您想要什么?"** / **"请告诉我您的偏好"** 这种开放式纯文字问法 —— 设计师认知负担重,响应慢。
 - ❌ 禁止:代设计师直接做决定(比如"我推断是 X,继续")而不给选项。
 - 🔴 **CHECKPOINT — 弹选项触发条件**:low 置信度 / badcase 命中 / 业务前缀 / 中文泛词 / 颜色冲突 / 分类歧义,任一命中**必须弹**。
-
-#### 多 Runtime 弹选项工具映射表
-
-> **核心原则**:不管 host agent 跑在哪个 runtime,都**必须**用该 runtime 提供的**多选项交互工具**弹选项,而不是纯文字输出。下面是 5 个主流 runtime 的对应工具,host agent 加载本 skill 时按当前 runtime 取对应列。
-
-| Runtime | 工具名 | 启用方式 | 备注 |
-|---|---|---|---|
-| **Claude Code** | `AskUserQuestion` | 内置,直接调用 | 当前 §实现示例用的就是这个 |
-| **Codex CLI** | `request_user_input` | 需在 `config.toml` 启用 `experimental_request_user_input = true` | 官方 commit `e0435af`(2026-06-05 合入) |
-| **OpenCode** | TUI 内置 `question` 工具 | 内置,通过 `permissions.questions` 配置 | TUI 风格,无独立 API |
-| **Hermes** | `prompt_user` | 内置 | 通用多选 prompt |
-| **Gemini CLI** | `request_user_input` | 内置 | 复用 Codex 类似的 schema |
-
-- ❌ **禁止 host agent 只在 Claude Code 跑得通就完事** —— 必须按当前 runtime 选对应工具。
-- ❌ **禁止**"我用的 runtime 没这个工具,所以跳过弹选项" —— 这是**逃避决策**,必须按下面 **§🛑 Fallback 协议**执行。
-- ✅ **Fallback 协议**(runtime 无多选项工具时,例如 Codex CLI 未启用 `experimental_request_user_input`):完整协议见下面 §🛑 Fallback 协议 章节,核心是 **4 阶段轮询 + 超时报错**,host agent **禁止绕过用户回应直接继续**。
+- 📖 **具体实现按 Agent 走两路**(详见 §询问用户选择 章节):
+  - **路径 A**:有原生工具(Claude Code / Codex / Cline / Copilot / OpenCode / Hermes / Gemini CLI)→ 调对应 API
+  - **路径 B**:无原生工具(降级)→ 纯文字编号列表 + 4 阶段轮询 + 超时报错
 
 ### 3. 必须等用户选,未选=未完成(runtime-neutral)
 
@@ -68,110 +206,6 @@ description: "Use when a designer is preparing an IconPark icon and needs help w
 | **host agent 默认采用主推** | "我先按 jc-icon-search 执行,你不同意再改" 或 弹完选项就自顾自继续 | 弹完选项 → **停下来** → 等用户点击/选择 → 拿到回应后**才**进入下一步 |
 | **用户沉默/不回应** | "你不说话我默认按主推走" 或 自顾自跳过本步 | **重新弹**相同选项,直到拿到显式回应(沉默 ≠ 同意) |
 
-## 🛑 Fallback 协议（runtime 无多选项工具时）
-
-> **触发条件**:host agent 跑在 Codex CLI(未启用 `experimental_request_user_input`)/ 其他无 `AskUserQuestion` 类工具的 runtime。
-> **核心矛盾**:`§🌐 强制约束 #2` 要求"必须弹选项",但工具不可用 → 必须有 **强约束 fallback 协议** 防止 host agent 跳过等待、自顾自继续。
-
-### 协议总览(4 阶段 + 超时)
-
-| 阶段 | host agent 行为 | 输出格式 | 等待规则 |
-|---|---|---|---|
-| **阶段 1:首次输出** | 纯文字给出 **3-4 个候选 + 显式 ⏸ 等待标识** | 见下"协议输出模板 A" | **必须停**——本轮 host agent 不再输出任何内容 |
-| **阶段 2:重试(用户没回应)** | 重新输出 **相同选项 + 显式 ⏸ 等待标识 + 提示"上一轮我在等你"** | 见下"协议输出模板 B" | **必须停** |
-| **阶段 3:升级(用户还没回应)** | 再次重试 + **显式给出退出选项** "输入 0 跳过 / 输入 free 自由描述" | 见下"协议输出模板 C" | **必须停** |
-| **阶段 4:超时(3 轮都没回应)** | 报错 + 不再继续 + 让用户切换 runtime 启用 `request_user_input` | 见下"协议输出模板 D" | 终止流程,记录到结果 |
-
-> 🛑 **强制约束**:**3 轮还没回应必须报超时**,**禁止** host agent 在 4 阶段自动"我推断用户沉默 = 同意主推"——这是**逃避决策**,违反 §🌐 强制约束 #3。
-
-### 协议输出模板 A(阶段 1)
-
-```
-═══════════════════════════════════════
-⏸  host agent 必须停在这里等设计师回应
-═══════════════════════════════════════
-
-[1] 感叹号/警告三角 (推荐)
-    → 单纯警告符号
-[2] 水晶+感叹号
-    → AI 风格的水晶出错图标
-[3] 机器人/人形
-    → 类似表情的'困惑/失败'角色
-[4] 其它形状
-    → 告诉我具体形状
-
-⚠️ host agent 输出到此为止 — 不要继续输出任何内容(包括"我先按 [1] 继续"等)。
-等设计师输入 1/2/3/4 之一后,host agent 再继续。
-```
-
-### 协议输出模板 B(阶段 2)
-
-```
-═══════════════════════════════════════
-⏸  上一轮我在等你输入选项编号(1/2/3/4)
-═══════════════════════════════════════
-
-[1] 感叹号/警告三角 (推荐)
-[2] 水晶+感叹号
-[3] 机器人/人形
-[4] 其它形状
-
-🟡 提示:沉默 ≠ 同意 — 必须显式选择才能继续。
-
-⚠️ host agent 输出到此为止 — 不要继续输出。
-```
-
-### 协议输出模板 C(阶段 3)
-
-```
-═══════════════════════════════════════
-⏸  第 3 次等待 — 仍需你输入选项编号
-═══════════════════════════════════════
-
-[1] 感叹号/警告三角 (推荐)
-[2] 水晶+感叹号
-[3] 机器人/人形
-[4] 其它形状
-[0] 跳过本步(我不确定,继续看下一步)
-[free] 自由描述(用一句话告诉我形状)
-
-⚠️ host agent 输出到此为止 — 不要继续输出。
-```
-
-### 协议输出模板 D(阶段 4:超时)
-
-```
-═══════════════════════════════════════
-🛑 流程中断:无法继续,需要工具支持
-═══════════════════════════════════════
-
-已等待 3 轮,设计师未回应。
-本 skill 在此 runtime 下无法保证设计师参与决策。
-
-🛠 修复建议(任选其一):
-- 切换到 Claude Code(内置 AskUserQuestion)
-- Codex CLI 启用 `experimental_request_user_input = true` 后重试
-- 设计师主动输入"0 跳过"或"free 自由描述"继续
-
-🛑 host agent 流程已终止 — 不再继续,等设计师指示。
-```
-
-### Fallback 协议对照(为什么 4 阶段)
-
-| 协议 | 解决什么 | 为什么需要 |
-|---|---|---|
-| 阶段 1 + ⏸ 标识 | 防止 host agent 弹完就自顾自 | 强制约束 #3 的"硬落地" |
-| 阶段 2 | 用户可能漏看第 1 轮 | 设计师多任务/分心场景 |
-| 阶段 3 | 用户想退出或自由输入 | 防止"卡死"在 4 选项 |
-| 阶段 4 超时 | 防止 host agent "自己猜" | 强制约束 #3 的"硬底线" |
-
-### 与正常 runtime 的差异
-
-- **正常 runtime**(Claude Code / 启用了 `request_user_input` 的 Codex):用工具弹选项,**不需要 fallback 协议**
-- **降级 runtime**(Codex default / 其他无工具):**走 fallback 协议**,纯文字 + 显式 ⏸ 等待
-- **不要混用**:即使在降级 runtime 也不要尝试调 `AskUserQuestion`(错位调用报错)
-
-## Step-by-Step 设计师交互流程
 
 ## Step-by-Step 设计师交互流程
 
@@ -415,94 +449,6 @@ if (svgHasGradientOrMulticolor) {
   })
 }
 ```
-
-### 多 Runtime 实现对照(必读)
-
-> **问题**:Claude Code 用 `AskUserQuestion` 跑得好,但 host agent 跑在 **Codex / OpenCode / Hermes / Gemini CLI** 时怎么办?下面给出 4 个 runtime 的等价实现,host agent 按当前 runtime 选对应段落。
-
-#### Codex CLI 实现
-
-```js
-// Codex CLI — 用 experimental_request_user_input
-// 前提: ~/.codex/config.toml 配 experimental_request_user_input = true
-const shape = await tools.request_user_input({
-  questions: [{
-    question: "这个图标实际形状是什么?",
-    header: "形状",
-    options: [
-      {label: "感叹号/警告三角 (推荐)", description: "单纯警告符号"},
-      {label: "水晶+感叹号", description: "AI 风格的水晶出错图标"},
-      {label: "机器人/人形", description: "类似表情的'困惑/失败'角色"},
-      {label: "其它形状", description: "告诉我具体形状"}
-    ],
-    multi_select: false  // 注意:Codex 用 snake_case,Claude Code 用 camelCase
-  }]
-})
-```
-
-#### OpenCode 实现
-
-```js
-// OpenCode — 用 TUI 内置 question 工具,通过 permissions.questions 配置
-// 配置 ~/.config/opencode/config.toml:
-//   [permissions]
-//   questions = ["iconpark-check", "iconpark-naming", "iconpark-category"]
-// 调用时 TUI 自动弹窗,host agent 只需在 YAML frontmatter 标 tool = "question"
-const shape = await tool("question", {
-  prompt: "这个图标实际形状是什么?",
-  options: [
-    "感叹号/警告三角 (推荐)",
-    "水晶+感叹号",
-    "机器人/人形",
-    "其它形状"
-  ]
-})
-```
-
-#### Hermes 实现
-
-```js
-// Hermes — 用 prompt_user 工具
-const shape = await prompt_user({
-  type: "single_select",
-  question: "这个图标实际形状是什么?",
-  options: [
-    {label: "感叹号/警告三角 (推荐)", value: "warn"},
-    {label: "水晶+感叹号", value: "crystal-warn"},
-    {label: "机器人/人形", value: "robot"},
-    {label: "其它形状", value: "other"}
-  ]
-})
-```
-
-#### Gemini CLI 实现
-
-```js
-// Gemini CLI — 用 request_user_input(schema 与 Codex 兼容)
-const shape = await tools.request_user_input({
-  questions: [{
-    question: "这个图标实际形状是什么?",
-    header: "形状",
-    options: [
-      {label: "感叹号/警告三角 (推荐)", description: "单纯警告符号"},
-      {label: "水晶+感叹号", description: "AI 风格的水晶出错图标"},
-      {label: "机器人/人形", description: "类似表情的'困惑/失败'角色"},
-      {label: "其它形状", description: "告诉我具体形状"}
-    ],
-    multiSelect: false
-  }]
-})
-```
-
-> 🛑 **强制约束**:host agent 加载本 skill 时**必须**识别当前 runtime(从 `process.env` / runtime metadata / 配置上下文),然后**只**调用该 runtime 对应的工具。**禁止**"我跑在 Codex 也写 `AskUserQuestion`,让 runtime 自己适配" —— 不同 runtime 工具名/schema 字段(camelCase vs snake_case)都不一样,错位调用直接报错。
-
-> 💡 **优势**:
-> - **认知负担低**:每轮只关注 1 个问题,2-3 秒决策
-> - **上下文精准**:第 N 轮的 options 由第 N-1 轮答案动态生成,选项更相关
-> - **收敛快**:拿到最少必要信息即停,不需要的轮次直接跳过
-> - **可解析**:label 即主分类,description 锁定辅分类,无需追问"什么意思"
-
-## 在设计师把图标上传到 IconPark **之前**，帮你做四件事：
 
 设计师**不需要懂命令行**，跟 Claude 对话即可：
 - 「帮我看下这个 SVG 该叫什么名字、放哪个分组」
