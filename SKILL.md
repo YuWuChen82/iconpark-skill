@@ -157,6 +157,305 @@ options:
 > - **没有 → 路径 B**(必须按 4 阶段轮询)
 > - **不要混用**:有原生工具却走纯文字 = 违反 §🌐 强制约束 #2
 
+## 📋 流程驱动的弹选项节点表(必须先预分析,再弹选项)
+
+> **核心原则**:**弹选项不是孤立的"提问",而是流程节点的"决策点"** —— 每个流程节点都对应一个特定的弹选项模板:**先输出预分析卡片**(展示当前上下文)→ **再弹选项**(基于预分析结果给候选)→ **等设计师回应** → **再进下一步**。
+>
+> ❌ **反例**(干巴巴的弹):刚读完 SVG 直接弹"实际形状是什么?" → 设计师无上下文,无法判断
+> ✅ **正确**(流程驱动):读完 SVG → 输出预分析卡片(badcase 命中 / 清洗结果 / SVG 实际形状) → 弹"这个形状对得上吗?" → 设计师基于预分析回答
+
+### 节点总览(7 个流程节点)
+
+| # | 节点 | 流程位置 | 弹选项模板 |
+|---|---|---|---|
+| A | 读 SVG 后预分析 | 步骤 2 后 / 步骤 3 前 | "我的预分析对得上吗?" |
+| B | badcase 命中(业务前缀/位置/中文泛词) | 步骤 4 | "剥离前缀后 X 是什么?" |
+| C | 命名歧义(中文 mapping 多候选) | 步骤 4 | "哪个英文名更贴?" |
+| D | 主分类歧义 | 步骤 5 | "归到哪个主分类?" |
+| E | 辅分类歧义(渐变/多色) | 步骤 6 | "辅分类选哪个?" |
+| F | low 置信度 + needs_visual_verification | 步骤 3-4 | "实际形状是?" |
+| G | 落库前最终确认 | 步骤 10 | "最终结果落库?" |
+
+### 节点 A:读 SVG 后预分析(必弹)
+
+> **触发**:**任何** SVG 文件被 `check` 命令处理后,在弹任何决策点之前**先弹这个**。
+> **目的**:让设计师看到 host agent "读懂了什么",避免"读错文件还问东问西"。
+
+#### A.1 预分析卡片(必输出,先于弹选项)
+
+```text
+═══════════════════════════════════════
+📋 预分析卡片 — 读 SVG 后(节点 A)
+═══════════════════════════════════════
+
+项目          | 内容
+文件          | /path/to/icon.svg
+badcase 命中  | ✅/❌(具体类型)
+清洗后        | (业务前缀/位置/年份已剥离后的内容)
+SVG 实际形状  | (从 8 渠道推断:viewBox、g id、d 命令关键字等)
+置信度        | high/medium/low
+主分类预判    | 候选 1 (推荐) / 候选 2 / 候选 3
+辅分类预判    | 候选 1 (推荐) / 候选 2 / 候选 3
+═══════════════════════════════════════
+```
+
+#### A.2 弹选项(基于预分析)
+
+```js
+AskUserQuestion({
+  questions: [{
+    question: "我的预分析对得上你的预期吗?",
+    header: "预分析确认",
+    options: [
+      {label: "完全对,按预分析继续 (推荐)", description: "命名/分类预判都接受,直接进入步骤 4"},
+      {label: "形状预判有误", description: "我重新看 path/group 给你修正"},
+      {label: "分类预判有误", description: "我看你心里有别的分类,告诉我"},
+      {label: "我直接补充信息", description: "用自由文本告诉我关键信息"}
+    ],
+    multiSelect: false
+  }]
+})
+```
+
+#### A.3 设计师回应后下一步
+
+| 回应 | 下一步 |
+|---|---|
+| 选"完全对" | 跳过形状确认,直接进入节点 C/D/E(命名/分类/辅分类) |
+| 选"形状预判有误" | 进入节点 F(low 置信度问形状) |
+| 选"分类预判有误" | 进入节点 D(主分类歧义) |
+| 选"自由补充" | 解析设计师输入 → 重新进预分析 |
+
+### 节点 B:badcase 命中(必弹)
+
+> **触发**:命中 §修复模式速查 9 个失败模式任一 → 弹这个。
+
+#### B.1 预分析卡片(已包含在节点 A 中,直接引用)
+
+#### B.2 弹选项(基于 badcase 类型动态生成)
+
+```js
+// 业务前缀(agent-/AI-/app-)命中
+AskUserQuestion({
+  questions: [{
+    question: "剥离 'agent-' 前缀后,实际是什么?",
+    header: "前缀剥离",
+    options: [
+      {label: "是一个光标 (推荐)", description: "剥离后是 cursor/clicking"},
+      {label: "是一个按钮", description: "剥离后是 button"},
+      {label: "其它形状", description: "我补充具体形状"},
+      {label: "前缀不是业务用的,保留", description: "就是叫 agent-xxx"}
+    ],
+    multiSelect: false
+  }]
+})
+
+// 位置前缀(二级页面-/首页-/弹窗-)命中
+AskUserQuestion({
+  questions: [{
+    question: "剥离 '二级页面-' 位置前缀后,实际是什么?",
+    header: "位置剥离",
+    options: [
+      {label: "收起图标 (推荐)", description: "箭头向下"},
+      {label: "展开图标", description: "箭头向右"},
+      {label: "关闭图标", description: "X 符号"},
+      {label: "其它", description: "我补充"}
+    ],
+    multiSelect: false
+  }]
+})
+
+// 中文泛词(数据/暂无内容/消息通知)命中
+AskUserQuestion({
+  questions: [{
+    question: "'数据' 是哪种图表?",
+    header: "泛词问形状",
+    options: [
+      {label: "柱状图 (推荐)", description: "bar chart"},
+      {label: "饼图", description: "pie chart"},
+      {label: "折线图", description: "line chart"},
+      {label: "表格", description: "table"}
+    ],
+    multiSelect: false
+  }]
+})
+```
+
+#### B.3 设计师回应后下一步
+
+| 回应 | 下一步 |
+|---|---|
+| 选"是 X" | 用 X 命名 + 继续节点 C/D/E |
+| 选"其它形状"+ 自由输入 | 用自由输入命名 |
+| 选"前缀不是业务用的,保留" | 警告一次 → 仍按保留命名 + low 置信度 |
+
+### 节点 C:命名歧义(主推 1 + 备选 2-3,必弹)
+
+> **触发**:中文 mapping 表返回 ≥ 2 个有效候选(例如「闪光」→ `flash` / `sparkle` / `twinkle`)。
+> **目的**:给设计师 3-4 个英文候选选一个,而不是 host agent 自己挑。
+
+#### C.1 弹选项
+
+```js
+AskUserQuestion({
+  questions: [{
+    question: "「闪光」图标,推荐哪个英文名?",
+    header: "命名",
+    options: [
+      {label: "jc-icon-sparkle (推荐)", description: "最常用,IconPark 主流命名"},
+      {label: "jc-icon-flash", description: "强调瞬间效果"},
+      {label: "jc-icon-twinkle", description: "强调闪烁感"},
+      {label: "我自己起一个", description: "用 free 自由输入"}
+    ],
+    multiSelect: false
+  }]
+})
+```
+
+#### C.2 设计师回应后下一步
+
+| 回应 | 下一步 |
+|---|---|
+| 选候选 | 命名确定,进入节点 D(主分类) |
+| 选"我自己起" + 自由输入 | 用自由输入作为 identifier(校验通过后) |
+
+### 节点 D:主分类歧义(主推 1 + 备选 2-3,必弹)
+
+> **触发**:分类决策树命中 ≥ 2 个分类关键词(例如「开关」同时命中"硬件"和"界面组件")。
+> **目的**:让设计师在 3-4 个候选分类中选一个。
+
+#### D.1 弹选项
+
+```js
+AskUserQuestion({
+  questions: [{
+    question: "「开关」图标应该归到哪个主分类?",
+    header: "主分类",
+    options: [
+      {label: "硬件 (推荐)", description: "物理开关感,IconPark 原始归类"},
+      {label: "界面组件", description: "UI 上的开关按钮"},
+      {label: "符号标识", description: "通用 on/off 符号"},
+      {label: "其它分类", description: "用 free 告诉我"}
+    ],
+    multiSelect: false
+  }]
+})
+```
+
+### 节点 E:辅分类歧义(SVG 含渐变/多色时必弹)
+
+> **触发**:SVG 内含 `linearGradient` / `radialGradient` / 多个 fill 颜色 → 命中 §辅分类候选"渐变色"/"定色(多色)"。
+
+#### E.1 弹选项
+
+```js
+AskUserQuestion({
+  questions: [{
+    question: "辅分类选哪个?",
+    header: "辅分类",
+    options: [
+      {label: "渐变色 (推荐)", description: "保留现有 linearGradient/radialGradient"},
+      {label: "定色(多色)", description: "渐变替换为具体色值 #28FFEF 等"},
+      {label: "常规线性", description: "去掉渐变,改单色描边"},
+      {label: "跳过(可空)", description: "本图标不需要辅分类"}
+    ],
+    multiSelect: false
+  }]
+})
+```
+
+### 节点 F:low 置信度 + needs_visual_verification(必弹)
+
+> **触发**:`confidence=low` 且 `needs_visual_verification=true` → 弹这个。
+> **目的**:Skill 不做视觉识别,必须问设计师"实际形状"。
+
+#### F.1 弹选项
+
+```js
+AskUserQuestion({
+  questions: [{
+    question: "这个图标实际是什么形状?",
+    header: "实际形状",
+    options: [
+      {label: "感叹号/警告三角 (推荐)", description: "单纯警告符号"},
+      {label: "水晶+感叹号", description: "AI 风格的水晶出错图标"},
+      {label: "机器人/人形", description: "类似表情的'困惑/失败'角色"},
+      {label: "其它形状", description: "用 free 告诉我具体形状"}
+    ],
+    multiSelect: false
+  }]
+})
+```
+
+### 节点 G:落库前最终确认(必弹)
+
+> **触发**:步骤 8-9 完成,准备输出最终 `jc-icon-xxx` 写入 IconPark 后台**前**。
+> **目的**:最后一道防错,避免把错的 identifier 推进 IconPark。
+
+#### G.1 最终卡片(必输出,先于弹选项)
+
+```text
+═══════════════════════════════════════
+✅ 最终结果(待确认)
+═══════════════════════════════════════
+
+identifier : jc-icon-sparkle
+主分类     : 界面组件
+辅分类     : 渐变色
+置信度     : high
+依据       : SVG <title>「闪光」命中 ZH_MAPPING,viewBox 24×24 含 radialGradient
+
+📋 复制粘贴文本:
+jc-icon-sparkle · 界面组件 · 渐变色
+═══════════════════════════════════════
+```
+
+#### G.2 弹选项
+
+```js
+AskUserQuestion({
+  questions: [{
+    question: "最终结果确认落库?",
+    header: "最终确认",
+    options: [
+      {label: "确认落库 (推荐)", description: "复制粘贴文本后写入 IconPark 后台"},
+      {label: "改命名", description: "回节点 C 重新选"},
+      {label: "改分类", description: "回节点 D 重新选"},
+      {label: "暂停(我不确定)", description: "暂存草稿,稍后再看"}
+    ],
+    multiSelect: false
+  }]
+})
+```
+
+### 7 节点串联(完整流程)
+
+```
+步骤 2 读 SVG (8 渠道)
+  ↓
+【节点 A】输出预分析卡片 → 弹"预分析对得上吗?" → 等回应
+  ↓
+【节点 B】badcase 命中? → 是 → 弹"剥离后 X 是什么?" → 等回应
+  ↓
+【节点 F】low 置信度? → 是 → 弹"实际形状是?" → 等回应
+  ↓
+【节点 C】命名歧义? → 是 → 弹"哪个英文名?" → 等回应
+  ↓
+【节点 D】主分类歧义? → 是 → 弹"归到哪个分类?" → 等回应
+  ↓
+【节点 E】辅分类歧义? → 是 → 弹"辅分类选哪个?" → 等回应
+  ↓
+【节点 G】最终卡片 → 弹"确认落库?" → 等回应
+  ↓
+落库
+```
+
+> 🛑 **强制约束**:
+> 1. **任何节点都不能跳过"先预分析"** — 没预分析就弹选项 = 干巴巴谈,违反本章原则
+> 2. **任何节点都不能"自己挑了"** — 即使觉得 100% 确定,也要弹让设计师确认(对应 §🌐 强制约束 #3)
+> 3. **节点触发不是互斥的** — 一次流程可能触发 A → B → F → C 多个节点
+> 4. **每个节点独立等回应** — A 回应后才进 B,B 回应后才进 F,以此类推
+
 ## 🌐 强制约束（host agent 必须遵守）
 
 > 这两条是**最高优先级**规则,凌驾于下文所有工作流之上 ——违反任一条 = 执行失败。
@@ -485,6 +784,7 @@ if (svgHasGradientOrMulticolor) {
 - 5. **🆕 禁止 host agent 默认采用主推 / 弹完选项自顾自继续**（违反 §🌐 强制约束 #3，必须等用户显式回应）
 - 6. **🆕 禁止"只在 Claude Code 适配弹选项"** —— 跑在 Codex / OpenCode / Hermes / Gemini CLI 时必须用对应 runtime 的工具（违反 §🌐 强制约束 #2 映射表）
 - 7. **🆕 禁止 host agent 绕过 §🛑 Fallback 协议** —— 跑在降级 runtime 时必须按 4 阶段轮询 + 超时报错,**禁止**"3 轮没回应我自己猜"或"我先用主推继续"
+- 8. **🆕 禁止"干巴巴弹选项"** —— 必须按 §📋 流程驱动弹选项节点表,**先输出预分析卡片 → 再弹选项 → 等回应**,**禁止**"读完 SVG 直接弹'实际形状是什么?'"这种无上下文的提问
 
 ## Skill 的能力边界（重要）
 
@@ -629,6 +929,7 @@ Skill 内部有一份双层关键词决策树（`data/category-decision.json`）
 | **🆕 host agent 想"我先按主推走,不同意再改"** | 🔴 **绝对禁止** — 这等于剥夺设计师决策权 | 严格按 §🌐 强制约束 #3 执行:弹完即停,等回应 |
 | **🆕 runtime 无 request_user_input 工具**(Codex CLI default 等) | 🔴 **禁止**"跳过等待" / **禁止**"我推断用户沉默=同意" / **禁止**绕过 fallback | 按 §🛑 Fallback 协议:阶段 1 纯文字 + ⏸ 等待 → 阶段 2 重试 → 阶段 3 升级(给 0/free 选项) → 阶段 4 超时报错切换 runtime |
 | **🆕 host agent 调错 runtime 工具**(Codex 调 AskUserQuestion) | 🔴 错位调用直接报错 — 必须按 §🌐 强制约束 #2 映射表选对应工具 | 启用 `experimental_request_user_input` 切换到正确 API |
+| **🆕 干巴巴弹选项(无流程上下文)** | 🔴 读完 SVG 不输出预分析卡片就直接弹"实际形状是什么?"—— 设计师无上下文无法判断 — 必须按 §📋 流程驱动弹选项节点表 | 弹选项前**先输出预分析卡片**(节点 A),再弹 A → B → F → C → D → E → G 节点链,每节点独立等回应 |
 
 ## 工作原理（设计师可跳过）
 
