@@ -195,7 +195,8 @@ ${c('bold', '用法：')}
 ${c('bold', '命令：')}
   check <file.svg> [--json]    检查 SVG：metadata 推断 + 变体检查
   recommend <中文名> [分类]     根据中文名推荐 identifier
-  update                        升级到最新版本（先备份再拉取）
+  update                        升级到最新版本（npm update -g ${
+  c('bold', '@yuwuchen/iconpark-skill') })
   help                          显示此帮助
 
 ${c('bold', 'check 输出：')}
@@ -319,7 +320,7 @@ function c(color, s) {
 }
 
 /**
- * update 子命令：执行升级（备份 → git pull → 校验 → 报告）
+ * update 子命令：执行升级（备份 → npm update -g → 校验 → 报告）
  */
 async function cmdUpdate(args) {
   const { autoYes } = parseUpdateArgs(args);

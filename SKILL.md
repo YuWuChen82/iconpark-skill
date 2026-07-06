@@ -333,47 +333,57 @@ iconpark recommend 闪光 常规线性                # 带辅分类
 
 ---
 
-## 十一、自更新协议（最高优先级之一）
+## 团队安装 / 自更新协议
 
-**触发条件**：CLI 在 **stderr** 输出形如下方的黄色提示行：
+### 团队安装
+
+```text
+npm install -g @yuwuchen/iconpark-skill --registry https://bnpm.byted.org/
+iconpark help
+```
+
+Agent 安装检测到 `iconpark update` 提示时，用 `Bash` 执行 `npm update -g @yuwuchen/iconpark-skill --registry https://bnpm.byted.org/`。
+
+### 自更新（CLI）
+
+**触发条件**：每次 CLI 启动时后台检查 bnpm 远端版本，有新版本时向 **stderr** 输出形如下方的黄色提示行：
 
 ```
 ⚠ iconpark: 本地 vX，远端 vY。运行 iconpark update 升级，或设 ICONPARK_NO_UPDATE_NOTIFY=1 关闭提醒。
 ```
 
-**你必须**：
+**host agent 必须**：
 
-1. 用 `AskUserQuestion`（或当前 runtime 的等价多选工具）询问用户，4 个选项：
+1. 用 `AskUserQuestion`（或当前 runtime 的等价多选工具）询问用户：
 
    | 选项 | label | description |
    |---|---|---|
-   | A | `立即更新 (推荐)` | 备份当前版本后升级，失败自动回滚 |
+   | A | `立即更新 (推荐)` | 备份当前版本后 `npm update -g @yuwuchen/iconpark-skill`，失败自动回滚 |
    | B | `稍后提醒` | 静默继续本次流程，5 小时后再提醒 |
    | C | `本次跳过` | 静默继续本次，下次启动再问 |
-   | D | `关闭提醒` | 永久关闭，不再询问（可手动 `iconpark update`） |
+   | D | `关闭提醒` | 永久关闭（`export ICONPARK_NO_UPDATE_NOTIFY=1`） |
 
-2. 用户选 **A 立即更新** → 调 `Bash("iconpark update")` → 把 stdout 转告用户（含新版本号 + 备份路径）
-3. 用户选 **B / C / D** → 静默继续本次流程，不复述提示
+2. 用户选 **A 立即更新** → `Bash("iconpark update")` → stdout 转告用户（含新版本号 + 备份路径）
+3. 用户选 **B / C / D** → 静默继续，不复述提示
 
 **禁止**：
-- 看到 stderr 提示不告知用户（违反"弹选项必须问"的核心原则）
-- 不询问直接执行 `iconpark update`（用户没同意）
-- 用 `git pull` / 手动改文件绕过 skill 自带更新（破坏备份/回滚链）
-- 把 stderr 提示当成 stdout 报错处理（这是信息，不是错误）
+- 看到 stderr 提示不弹选项
+- 不询问直接 `npm update -g`
+- 用 `git pull` 绕过（已废弃，不再支持 GitHub git pull 模式）
 
-**环境变量**（团队自管理用）：
+**环境变量**：
 
 | 变量 | 作用 |
 |---|---|
-| `ICONPARK_NO_UPDATE_NOTIFY=1` | 永久关闭检查（写入 ~/.cache/iconpark/check.json 也会被尊重） |
-| `ICONPARK_VERSION_URL=<url>` | 覆盖默认远端（团队内网 fork / 测试用） |
+| `ICONPARK_NO_UPDATE_NOTIFY=1` | 永久关闭检查 |
+| `ICONPARK_REGISTRY=<url>` | 覆盖 bnpm registry（内网/测试用）|
+| `ICONPARK_PACKAGE_NAME=<pkg>` | 覆盖包名（fork 测试用）|
 
-**实现细节**：`scripts/lib/updater.js` — `await` 同步检查（避免快速命令下 fire-and-forget 丢失 stderr），24h TTL 缓存（`~/.cache/iconpark/check.json`），HTTP fetch 失败时降级到 `git ls-remote` 拿 HEAD commit hash 作版本号，错误日志写到 `~/.cache/iconpark/last_error.json`（含 stage/message/cause 方便排查）。`update` 子命令先备份整个 skill 目录到 `~/.cache/iconpark/backups/<时间戳>_iconpark/` 再 `git pull --ff-only`。
+**实现细节**：`scripts/lib/updater.js` — 24h TTL 缓存 `~/.cache/iconpark/check.json`，fetch bnpm registry `dist-tags.latest`（3s），fallback 到 `npm view` CLI。`iconpark update` → 备份到 `~/.cache/iconpark/backups/<时间戳>_iconpark/` → `npm update -g @yuwuchen/iconpark-skill`。
 
-**排查指南**（自更新不工作时按顺序检查）：
+**排查指南**：
 
 1. `cat ~/.cache/iconpark/check.json` 看最近一次缓存的远端版本和时间
-2. `cat ~/.cache/iconpark/last_error.json` 看 fetch 失败的详细原因
-3. 手动测连通性：`curl -sIL https://raw.githubusercontent.com/YuWuChen82/iconpark-skill/main/VERSION`（应返回 200 + body `0.6.0`）
-4. 内网/代理环境：`export ICONPARK_VERSION_URL=https://内网mirror/iconpark/VERSION`
-5. 确认关闭：`echo $ICONPARK_NO_UPDATE_NOTIFY` 应为空
+2. 手动测连通性：`npm view @yuwuchen/iconpark-skill version --registry https://bnpm.byted.org/`（应返回版本号）
+3. 手动测更新：`npm update -g @yuwuchen/iconpark-skill --registry https://bnpm.byted.org/`
+4. 确认关闭：`echo $ICONPARK_NO_UPDATE_NOTIFY` 应为空
