@@ -10,12 +10,13 @@
     "start": "node ./scripts/iconpark.js",
     "version": "node scripts/sync-version.cjs",
     "postversion": "git push --follow-tags",
-    "publish:patch": "npm version patch && npm publish",
-    "publish:minor": "npm version minor && npm publish",
-    "publish:major": "npm version major && npm publish"
+    "release": "node scripts/release.cjs",
+    "release:patch": "node scripts/release.cjs patch",
+    "release:minor": "node scripts/release.cjs minor",
+    "release:major": "node scripts/release.cjs major"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "files": [
     "scripts/",
@@ -23,5 +24,8 @@
   ],
   "publishConfig": {
     "registry": "https://bnpm.byted.org/"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.31.0"
   }
 }
