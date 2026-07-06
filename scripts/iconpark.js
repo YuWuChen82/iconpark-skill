@@ -255,9 +255,17 @@ function buildJsonEnvelope(data) {
       suggestions: data.naming.suggestions,
     },
     category: {
-      primary: data.category.primary,
-      alternatives: data.category.alternatives,
-      rationale: data.category.rationale,
+      primary: data.category.primary.primary,
+      alternatives: data.category.primary.alternatives,
+      rationale: data.category.primary.rationale,
+      sub: data.category.sub
+        ? {
+            primary: data.category.sub.primary,
+            alternatives: data.category.sub.alternatives,
+            rationale: data.category.sub.rationale,
+          }
+        : null,
+      group: data.category.group,
     },
     meta: {
       title: data.meta.title,

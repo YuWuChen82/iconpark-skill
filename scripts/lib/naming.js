@@ -70,6 +70,8 @@ const ZH_MAPPING = {
   '波纹': 'ripple', '辐射': 'ripple', '点击波': 'click-ripple',
   // 时间/位置
   '日历': 'calendar', '日期': 'date', '时间': 'time', '时钟': 'clock',
+  '标签': 'tag', '标签页': 'tab', '徽章': 'badge',
+  '拍照': 'camera', '拍摄': 'camera', '摄影': 'camera', '录像': 'record', '直播': 'live',
   '地图': 'map', '位置': 'location', '定位': 'location', '导航': 'navigation',
   '路线': 'route', '地址': 'address',
   // 商业
