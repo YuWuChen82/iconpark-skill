@@ -1,6 +1,6 @@
 ---
 name: iconpark
-version: 0.5.0
+version: 0.6.0
 description: "Use when a designer is preparing an IconPark icon and needs help with naming or two-tier categorization. Given an SVG file or Chinese description, recommends a standard identifier name, a primary semantic category (one of 36 official IconPark categories), an optional color sub-category (one of 7). Learns from goodcase/badcase reference sets in `assets/goodcase/` and `assets/badcase/` directories. Runtime-neutral: works in Claude Code (AskUserQuestion), Codex CLI (request_user_input), OpenCode (TUI question), Hermes (prompt_user), Gemini CLI (request_user_input). **v0.5+ 每次使用自动检查更新并提示用户。** Triggers: 'check SVG', '推荐名字', '选分组', '该放哪个分类', '命名不规范', 'jc-icon-', 'IconPark 上传'."
 ---
 
@@ -347,4 +347,38 @@ iconpark recommend 闪光 常规线性                # 带辅分类
 | `ICONPARK_NO_UPDATE_NOTIFY=1` | 永久关闭检查（写入 ~/.cache/iconpark/check.json 也会被尊重） |
 | `ICONPARK_VERSION_URL=<url>` | 覆盖默认远端（团队内网 fork / 测试用） |
 
-**实现细节**（如需了解）：`scripts/lib/updater.js` — fire-and-forget 后台检查，24h TTL 缓存（`~/.cache/iconpark/check.json`），3s 网络超时静默失败，update 子命令先备份到 `~/.cache/iconpark/backups/<时间戳>_iconpark/` 再 `git pull`。
+**实现细节**（v0.6 更新）：`scripts/lib/updater.js` — `await` 同步检查（避免快速命令下 fire-and-forget 丢失 stderr），24h TTL 缓存（`~/.cache/iconpark/check.json`），HTTP fetch 失败时降级到 `git ls-remote` 拿 HEAD commit hash 作版本号，错误日志写到 `~/.cache/iconpark/last_error.json`（含 stage/message/cause 方便排查）。`update` 子命令先备份整个 skill 目录到 `~/.cache/iconpark/backups/<时间戳>_iconpark/` 再 `git pull --ff-only`。
+
+**排查指南**（自更新不工作时按顺序检查）：
+
+1. `cat ~/.cache/iconpark/check.json` 看最近一次缓存的远端版本和时间
+2. `cat ~/.cache/iconpark/last_error.json` 看 fetch 失败的详细原因
+3. 手动测连通性：`curl -sIL https://raw.githubusercontent.com/YuWuChen82/iconpark-skill/main/VERSION`（应返回 200 + body `0.6.0`）
+4. 内网/代理环境：`export ICONPARK_VERSION_URL=https://内网mirror/iconpark/VERSION`
+5. 确认关闭：`echo $ICONPARK_NO_UPDATE_NOTIFY` 应为空
+
+---
+
+## 十二、版本变更日志
+
+### v0.6.0（2026-07-06）
+
+**新增**：
+- 自更新机制健壮性升级：fetch 失败时降级到 `git ls-remote` 拿 HEAD commit hash
+- 错误日志写到 `~/.cache/iconpark/last_error.json`，方便排查网络/CDN/SSL 问题
+- 排查指南章节（见上）
+
+**修复**：
+- ESM `require` 兼容 bug：原 `scripts/lib/updater.js` 在 ESM 下用 `require('node:fs')` 导致 `isGit` 永远返回 false，update 子命令误报"不是 git 仓库"。改为顶层 `import { ... } from 'node:fs'`
+- 快速命令下 stderr 丢失 bug：`checkForUpdateBackground` 是 fire-and-forget，`help` 等几十毫秒就退出的命令会把 IIFE 砍掉。改为 `await checkForUpdate()`，正常 +200ms 可接受
+- `package.json` 版本号对齐到 0.5.0（之前停留在 0.3.0）
+
+**无破坏性变更**：现有用户升级无感，只是自更新更可靠。
+
+### v0.5.0（2026-07-06，初始发布）
+
+**新增**：
+- `scripts/lib/updater.js` — 自更新模块
+- `iconpark update` 子命令
+- `VERSION` 文件（远端版本源）
+- SKILL.md "自更新协议" 章节
