@@ -1,6 +1,6 @@
 ---
 name: iconpark
-version: 0.7.1
+version: 0.7.2
 description: "Use when a designer is preparing an IconPark icon and needs help with naming or two-tier categorization. Given an SVG file or Chinese description, recommends a standard identifier name, a primary semantic category (one of 36 official IconPark categories), an optional color sub-category (one of 7). Learns from goodcase/badcase reference sets in `assets/goodcase/` and `assets/badcase/` directories. Runtime-neutral: works in Claude Code (AskUserQuestion), Codex CLI (request_user_input), OpenCode (TUI question), Hermes (prompt_user), Gemini CLI (request_user_input). **三级智能识别：文本 → 几何启发式 → 视觉 → 兜底询问，避免低置信度直接弹问让设计师觉得 AI 笨。** Triggers: 'check SVG', '推荐名字', '选分组', '该放哪个分类', '命名不规范', 'jc-icon-', 'IconPark 上传', 'AI 笨'."
 ---
 

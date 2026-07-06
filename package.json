@@ -1,6 +1,6 @@
 {
   "name": "iconpark-skill",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "type": "module",
   "description": "即创 IconPark 图标命名与分组推荐本地 Skill（精简版，无外部依赖，v0.5+ 自带自更新）",
   "bin": {
