@@ -1,5 +1,5 @@
 {
-  "name": "iconpark-skill",
+  "name": "@bytedance-dev/iconpark-skill",
   "version": "0.7.2",
   "type": "module",
   "description": "IconPark 图标命名与分组推荐本地 Skill，纯文本分析，零第三方依赖",
@@ -9,7 +9,10 @@
   "scripts": {
     "start": "node ./scripts/iconpark.js",
     "version": "node scripts/sync-version.cjs",
-    "postversion": "git push --follow-tags"
+    "postversion": "git push --follow-tags",
+    "publish:patch": "npm version patch && npm publish",
+    "publish:minor": "npm version minor && npm publish",
+    "publish:major": "npm version major && npm publish"
   },
   "engines": {
     "node": ">=18"
@@ -17,5 +20,8 @@
   "files": [
     "scripts/",
     "assets/"
-  ]
+  ],
+  "publishConfig": {
+    "registry": "https://bnpm.byted.org/"
+  }
 }
