@@ -4,7 +4,7 @@
   "type": "module",
   "description": "IconPark 图标命名与分组推荐本地 Skill，纯文本分析，零第三方依赖",
   "bin": {
-    "iconpark": "./scripts/iconpark.js"
+    "iconpark": "scripts/iconpark.js"
   },
   "scripts": {
     "start": "node ./scripts/iconpark.js",
