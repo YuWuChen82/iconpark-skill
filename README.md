@@ -4,10 +4,8 @@
 
 | | |
 |---|---|
-| 版本 | v0.5.0 (dev: v0.6 样式后缀) |
 | 依赖 | Node ≥ 18；零第三方 |
-| License | 内部使用 |
-| 完整规范 | [`SKILL.md`](./SKILL.md)（host agent 入口，~350 行）|
+| 完整规范 | [`SKILL.md`](./SKILL.md)（host agent 入口）|
 
 ---
 
@@ -20,7 +18,7 @@
     1) git clone 到 skill 目录（默认 ~/.claude/skills/iconpark，其它 runtime 自查）
     2) 跑 `node scripts/iconpark.js help` 验证能输出帮助文本
     3) 把 SKILL.md frontmatter 的触发词加进路由表
-  完成后报告: 安装路径 + help 首行版本号。
+  完成后报告: 安装路径 + 验证步骤是否成功。
 ```
 
 > 触发词 / 硬约束 / 自更新协议等代理规则全部在 [SKILL.md](./SKILL.md)。
@@ -43,7 +41,6 @@ iconpark check icons/foo.svg               # 彩色卡片
 iconpark check icons/foo.svg --json        # JSON 含 confidence + needs_visual_verification
 iconpark recommend 双星                     # 纯命名
 iconpark recommend 闪光 常规线性             # 带辅分类
-iconpark update                             # 升级（先备份再 git pull，失败自动回滚）
 iconpark help
 ```
 
@@ -70,11 +67,3 @@ assets/
 references/
   test-prompts.json
 ```
-
----
-
-## 🔄 更新
-
-- `iconpark update` —— 备份到 `~/.cache/iconpark/backups/` 后 `git pull`，失败自动回滚
-- `export ICONPARK_NO_UPDATE_NOTIFY=1` —— 永久关闭 stderr 提示
-- `ICONPARK_VERSION_URL=<url>` —— 团队内网 fork 覆盖默认远端

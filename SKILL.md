@@ -1,7 +1,7 @@
 ---
 name: iconpark
 version: 0.7.1
-description: "Use when a designer is preparing an IconPark icon and needs help with naming or two-tier categorization. Given an SVG file or Chinese description, recommends a standard identifier name, a primary semantic category (one of 36 official IconPark categories), an optional color sub-category (one of 7). Learns from goodcase/badcase reference sets in `assets/goodcase/` and `assets/badcase/` directories. Runtime-neutral: works in Claude Code (AskUserQuestion), Codex CLI (request_user_input), OpenCode (TUI question), Hermes (prompt_user), Gemini CLI (request_user_input). **v0.7+ 三级智能识别：文本→几何启发式→视觉→兜底询问，避免低置信度直接弹问让设计师觉得 AI 笨。** **v0.5+ 每次使用自动检查更新并提示用户。** Triggers: 'check SVG', '推荐名字', '选分组', '该放哪个分类', '命名不规范', 'jc-icon-', 'IconPark 上传', 'AI 笨' (v0.7)."
+description: "Use when a designer is preparing an IconPark icon and needs help with naming or two-tier categorization. Given an SVG file or Chinese description, recommends a standard identifier name, a primary semantic category (one of 36 official IconPark categories), an optional color sub-category (one of 7). Learns from goodcase/badcase reference sets in `assets/goodcase/` and `assets/badcase/` directories. Runtime-neutral: works in Claude Code (AskUserQuestion), Codex CLI (request_user_input), OpenCode (TUI question), Hermes (prompt_user), Gemini CLI (request_user_input). **三级智能识别：文本 → 几何启发式 → 视觉 → 兜底询问，避免低置信度直接弹问让设计师觉得 AI 笨。** Triggers: 'check SVG', '推荐名字', '选分组', '该放哪个分类', '命名不规范', 'jc-icon-', 'IconPark 上传', 'AI 笨'."
 ---
 
 # IconPark 图标设计师助手
@@ -130,7 +130,7 @@ await AskUserQuestion({
 - **格式**：`jc-icon-<kebab-case>`，如 `jc-icon-info`、`jc-icon-check-circle-filled`；小写+横杠，无大写/空格/特殊符号。
 - **按形状命名，不按场景**：图标叫什么看它**长什么样**，不看它**用在哪里**。✅ `jc-icon-info` ❌ `jc-icon-tips-popup`；✅ `jc-icon-user` ❌ `jc-icon-user-avatar`。
 - **同义多图标**：用后缀 `-one`/`-two`/`-three` 区分（`like`/`like-one`/`like-two`）。
-- **样式定型用后缀标注**（v0.6+ 新增）：当 SVG 内嵌样式信息使样式成为图标本身的一部分时，名字加后缀标注（**仅样式"焊死"在图标里才加；颜色首选仍是代码 `fill`**）：
+- **样式定型用后缀标注**：当 SVG 内嵌样式信息使样式成为图标本身的一部分时，名字加后缀标注（**仅样式"焊死"在图标里才加；颜色首选仍是代码 `fill`**）：
   - SVG 含 `<linearGradient>` / `<radialGradient>` → 名加 `-gradient`（例：`jc-icon-pointer-gradient`）
   - SVG 含 ≥2 个不同 `fill` 色值 → 名加 `-multicolor`（例：`jc-icon-pointer-multicolor`）
   - 含 `brand` / `logo` 关键词 → 名加 `-brand`
@@ -163,7 +163,7 @@ await AskUserQuestion({
 
 ---
 
-## 五、Skill 的能力边界（v0.7+ 三级智能识别）
+## 五、Skill 的能力边界（三级智能识别）
 
 **别让设计师觉得 AI 笨** —— 文本分析是第一关，但**视觉/几何能力范围内必须先用**，把"问设计师"留到最后一道。
 
@@ -191,9 +191,9 @@ await AskUserQuestion({
 
 ⚠️ **Tier 2+Tier 3 都不到位时**才允许跳到 Tier 4 询问；跳过 Tier 2/Tier 3 直接问 = §四「偷懒跳问」badcase。
 
-### 🛑 绝对禁止（v0.7 修订）
+### 🛑 绝对禁止
 
-1. **跳过 Tier 2 启发式 / Tier 3 视觉 直接问设计师** —— 这是让设计师觉得 AI 笨的根因（v0.7 之前 12 轮的痛点）。文本信号为 0 时**必须**先跑 Tier 2 几何识别；host agent 有 vision 工具时**必须**先跑 Tier 3 看图；前三道全失败才允许 Tier 4 询问。
+1. **跳过 Tier 2 启发式 / Tier 3 视觉 直接问设计师** —— 这是让设计师觉得 AI 笨的根因。文本信号为 0 时**必须**先跑 Tier 2 几何识别；host agent 有 vision 工具时**必须**先跑 Tier 3 看图；前三道全失败才允许 Tier 4 询问。
 2. 忽略 `needs_visual_verification=true` 信号直接给最终名字
 3. 推荐 `jc-icon-untitled` 作为最终答案（仅作占位，不得当结果落库）
 4. 分类决策树没命中时硬猜（必须用默认分类+标 medium 置信度）
@@ -333,12 +333,12 @@ iconpark recommend 闪光 常规线性                # 带辅分类
 
 ---
 
-## 十一、自更新协议（最高优先级之一，v0.5+ 生效）
+## 十一、自更新协议（最高优先级之一）
 
 **触发条件**：CLI 在 **stderr** 输出形如下方的黄色提示行：
 
 ```
-⚠ iconpark: 本地 v0.4.0，远端 v0.5.0。运行 iconpark update 升级，或设 ICONPARK_NO_UPDATE_NOTIFY=1 关闭提醒。
+⚠ iconpark: 本地 vX，远端 vY。运行 iconpark update 升级，或设 ICONPARK_NO_UPDATE_NOTIFY=1 关闭提醒。
 ```
 
 **你必须**：
@@ -368,7 +368,7 @@ iconpark recommend 闪光 常规线性                # 带辅分类
 | `ICONPARK_NO_UPDATE_NOTIFY=1` | 永久关闭检查（写入 ~/.cache/iconpark/check.json 也会被尊重） |
 | `ICONPARK_VERSION_URL=<url>` | 覆盖默认远端（团队内网 fork / 测试用） |
 
-**实现细节**（v0.6 更新）：`scripts/lib/updater.js` — `await` 同步检查（避免快速命令下 fire-and-forget 丢失 stderr），24h TTL 缓存（`~/.cache/iconpark/check.json`），HTTP fetch 失败时降级到 `git ls-remote` 拿 HEAD commit hash 作版本号，错误日志写到 `~/.cache/iconpark/last_error.json`（含 stage/message/cause 方便排查）。`update` 子命令先备份整个 skill 目录到 `~/.cache/iconpark/backups/<时间戳>_iconpark/` 再 `git pull --ff-only`。
+**实现细节**：`scripts/lib/updater.js` — `await` 同步检查（避免快速命令下 fire-and-forget 丢失 stderr），24h TTL 缓存（`~/.cache/iconpark/check.json`），HTTP fetch 失败时降级到 `git ls-remote` 拿 HEAD commit hash 作版本号，错误日志写到 `~/.cache/iconpark/last_error.json`（含 stage/message/cause 方便排查）。`update` 子命令先备份整个 skill 目录到 `~/.cache/iconpark/backups/<时间戳>_iconpark/` 再 `git pull --ff-only`。
 
 **排查指南**（自更新不工作时按顺序检查）：
 
@@ -377,29 +377,3 @@ iconpark recommend 闪光 常规线性                # 带辅分类
 3. 手动测连通性：`curl -sIL https://raw.githubusercontent.com/YuWuChen82/iconpark-skill/main/VERSION`（应返回 200 + body `0.6.0`）
 4. 内网/代理环境：`export ICONPARK_VERSION_URL=https://内网mirror/iconpark/VERSION`
 5. 确认关闭：`echo $ICONPARK_NO_UPDATE_NOTIFY` 应为空
-
----
-
-## 十二、版本变更日志
-
-### v0.6.0（2026-07-06）
-
-**新增**：
-- 自更新机制健壮性升级：fetch 失败时降级到 `git ls-remote` 拿 HEAD commit hash
-- 错误日志写到 `~/.cache/iconpark/last_error.json`，方便排查网络/CDN/SSL 问题
-- 排查指南章节（见上）
-
-**修复**：
-- ESM `require` 兼容 bug：原 `scripts/lib/updater.js` 在 ESM 下用 `require('node:fs')` 导致 `isGit` 永远返回 false，update 子命令误报"不是 git 仓库"。改为顶层 `import { ... } from 'node:fs'`
-- 快速命令下 stderr 丢失 bug：`checkForUpdateBackground` 是 fire-and-forget，`help` 等几十毫秒就退出的命令会把 IIFE 砍掉。改为 `await checkForUpdate()`，正常 +200ms 可接受
-- `package.json` 版本号对齐到 0.5.0（之前停留在 0.3.0）
-
-**无破坏性变更**：现有用户升级无感，只是自更新更可靠。
-
-### v0.5.0（2026-07-06，初始发布）
-
-**新增**：
-- `scripts/lib/updater.js` — 自更新模块
-- `iconpark update` 子命令
-- `VERSION` 文件（远端版本源）
-- SKILL.md "自更新协议" 章节
