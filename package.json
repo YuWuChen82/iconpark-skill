@@ -1,5 +1,5 @@
 {
-  "name": "@bytedance-dev/iconpark-skill",
+  "name": "iconpark-skill",
   "version": "0.7.2",
   "type": "module",
   "description": "IconPark 图标命名与分组推荐本地 Skill，纯文本分析，零第三方依赖",
@@ -9,7 +9,6 @@
   "scripts": {
     "start": "node ./scripts/iconpark.js",
     "version": "node scripts/sync-version.cjs",
-    "prepublishOnly": "node scripts/sync-version.cjs && node -e \"if (!require('child_process').execSync('git tag --points-at HEAD',{encoding:'utf8'}).trim()) { console.warn('⚠ 当前 HEAD 无 git tag, 确认 `npm version patch` 跑过?'); process.exit(1); }\"",
     "postversion": "git push --follow-tags"
   },
   "engines": {
@@ -18,8 +17,5 @@
   "files": [
     "scripts/",
     "assets/"
-  ],
-  "publishConfig": {
-    "registry": "https://bnpm.byted.org/"
-  }
+  ]
 }

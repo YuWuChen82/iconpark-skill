@@ -5,9 +5,11 @@
  * 由 package.json scripts.version 调用。
  */
 const v = require('../package.json').version;
-require('fs').writeFileSync('VERSION', v + '\n');
-let md = require('fs').readFileSync('SKILL.md', 'utf8');
+const fs = require('fs');
+const cp = require('child_process');
+fs.writeFileSync('VERSION', v + '\n');
+let md = fs.readFileSync('SKILL.md', 'utf8');
 md = md.replace(/^version: [^\n]+/m, 'version: ' + v);
-require('fs').writeFileSync('SKILL.md', md);
-require('child_process').execSync('git add VERSION SKILL.md', { cwd: process.cwd() });
-console.log(`✓ synced VERSION + SKILL.md frontmatter → v${v}`);
+fs.writeFileSync('SKILL.md', md);
+cp.execSync('git add VERSION SKILL.md', { cwd: process.cwd() });
+console.log(`✓ synced VERSION + SKILL.md → v${v}`);
