@@ -21,7 +21,7 @@ import { recommendCategory } from './lib/category.js';
 import { generateTemplate, identifierFromFilename } from './lib/template.js';
 import { extractSvgMetadata, suggestIdentifierFromMeta } from './lib/svg-metadata.js';
 import { renderCheckCard, renderRecommendCard } from './lib/render.js';
-import { checkForUpdateBackground, performUpdate } from './lib/updater.js';
+import { checkForUpdate, performUpdate } from './lib/updater.js';
 import { readFileSync } from 'node:fs';
 
 // 从 SKILL.md frontmatter 读本地版本号
@@ -344,8 +344,8 @@ function parseUpdateArgs(rawArgs) {
 }
 
 async function main() {
-  // 🔥 自更新检查：后台 fire-and-forget，零阻塞
-  checkForUpdateBackground(LOCAL_VERSION);
+  // 🔥 自更新检查：await 一次（正常 200ms，最多 5s），避免快速命令下 IIFE 来不及写 stderr
+  await checkForUpdate(LOCAL_VERSION);
 
   const [cmd, ...args] = process.argv.slice(2);
   if (!cmd) {
