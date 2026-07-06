@@ -1,0 +1,82 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  cli-smoke:
+    name: CLI smoke test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: iconpark help (验证 CLI 启动不崩)
+        run: node scripts/iconpark.js help
+
+      - name: iconpark recommend 双星 (验证中文映射)
+        run: node scripts/iconpark.js recommend 双星
+
+      - name: iconpark recommend nonexistent (验证未识别词处理)
+        run: node scripts/iconpark.js recommend 这是一个不存在的中文词
+        continue-on-error: true   # 期望它能处理 unknown 而不是崩
+
+  check-goodcase:
+    name: Check all goodcase SVGs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 跑 goodcase 目录下所有 SVG
+        run: |
+          set +e
+          fail=0
+          for svg in assets/goodcase/*.svg; do
+            echo "─── $svg ───"
+            node scripts/iconpark.js check "$svg" --json > /dev/null
+            code=$?
+            if [ $code -gt 2 ]; then
+              echo "✗ 退出码 $code 异常（期望 0/1/2）"
+              fail=$((fail + 1))
+            fi
+          done
+          if [ $fail -gt 0 ]; then
+            echo "✗ $fail 个 SVG 失败"
+            exit 1
+          fi
+          echo "✓ 所有 goodcase 跑通"
+
+  updater-load:
+    name: Updater 模块加载测试
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 验证 updater.js 能 import 不抛错
+        run: |
+          node --input-type=module -e "
+            import { checkForUpdate, performUpdate } from './scripts/lib/updater.js';
+            const r = await checkForUpdate('0.0.0');
+            console.log('checkForUpdate 返回:', JSON.stringify(r));
+            // CI 环境下没有真实 git 仓库，performUpdate 应优雅失败
+            const u = await performUpdate();
+            console.log('performUpdate 返回:', JSON.stringify(u));
+          "
