@@ -21,10 +21,23 @@ import { recommendCategory } from './lib/category.js';
 import { generateTemplate, identifierFromFilename } from './lib/template.js';
 import { extractSvgMetadata, suggestIdentifierFromMeta } from './lib/svg-metadata.js';
 import { renderCheckCard, renderRecommendCard } from './lib/render.js';
+import { checkForUpdateBackground, performUpdate } from './lib/updater.js';
+import { readFileSync } from 'node:fs';
+
+// 从 SKILL.md frontmatter 读本地版本号
+const LOCAL_VERSION = (() => {
+  try {
+    const md = readFileSync(path.join(SKILL_ROOT, 'SKILL.md'), 'utf8');
+    return (md.match(/^version:\s*(\S+)/m) || [])[1] || '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+})();
 
 const COMMANDS = {
   check: cmdCheck,
   recommend: cmdRecommend,
+  update: cmdUpdate,
   help: cmdHelp,
 };
 
@@ -174,7 +187,7 @@ async function cmdRecommend(args) {
 
 async function cmdHelp() {
   console.log(`
-${c('bold', 'IconPark 本地 Skill（精简版）')}
+${c('bold', 'IconPark 本地 Skill（精简版, v' + LOCAL_VERSION + '）')}
 
 ${c('bold', '用法：')}
   iconpark <command> [args...]
@@ -182,6 +195,7 @@ ${c('bold', '用法：')}
 ${c('bold', '命令：')}
   check <file.svg> [--json]    检查 SVG：metadata 推断 + 变体检查
   recommend <中文名> [分类]     根据中文名推荐 identifier
+  update                        升级到最新版本（先备份再拉取）
   help                          显示此帮助
 
 ${c('bold', 'check 输出：')}
@@ -296,7 +310,43 @@ function c(color, s) {
   return `\x1b[${codes[color] || 0}m${s}\x1b[0m`;
 }
 
+/**
+ * update 子命令：执行升级（备份 → git pull → 校验 → 报告）
+ */
+async function cmdUpdate(args) {
+  const { autoYes } = parseUpdateArgs(args);
+  console.log(c('cyan', `当前版本：v${LOCAL_VERSION}`));
+  console.log(c('cyan', '正在检查远端版本…'));
+  const result = await performUpdate();
+  if (result.ok) {
+    console.log(c('green', result.message));
+    console.log(c('gray', '\n提示：下次启动 CLI 会自动检测新版本。'));
+  } else {
+    console.log(c('red', `✗ ${result.message}`));
+    process.exit(1);
+  }
+}
+
+function parseUpdateArgs(rawArgs) {
+  try {
+    const parsed = parseArgs({
+      args: rawArgs,
+      options: {
+        yes: { type: 'boolean', short: 'y', default: false },
+      },
+      strict: true,
+      allowPositionals: true,
+    });
+    return { autoYes: parsed.values.yes };
+  } catch {
+    return { autoYes: false };
+  }
+}
+
 async function main() {
+  // 🔥 自更新检查：后台 fire-and-forget，零阻塞
+  checkForUpdateBackground(LOCAL_VERSION);
+
   const [cmd, ...args] = process.argv.slice(2);
   if (!cmd) {
     await cmdHelp();
