@@ -1,6 +1,6 @@
 {
   "name": "@yuwuchen/iconpark-skill",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "type": "module",
   "description": "IconPark 图标命名与分组推荐本地 Skill，纯文本分析，零第三方依赖",
   "bin": {
