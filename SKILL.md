@@ -335,12 +335,20 @@ iconpark recommend 闪光 常规线性                # 带辅分类
 
 ## 团队安装 / 自更新协议
 
-### 团队安装
+### 团队安装（三种方式，任选其一）
 
 ```text
-npm install -g @yuwuchen/iconpark-skill --registry https://bnpm.byted.org/
-iconpark help
+A) bnpm 全局安装(postinstall 自动软链):
+   npm install -g @yuwuchen/iconpark-skill --registry https://bnpm.byted.org/
+
+B) agentbuddy 字节官方安装器(经 skills.bytedance.net):
+   npm_config_registry="https://bnpm.byted.org" pnpx agentbuddy@latest skill collection add <id>
+
+C) git clone 直装(最快):
+   git clone https://github.com/YuWuChen82/iconpark-skill ~/.claude/skills/iconpark
 ```
+
+> 卸载任意一种: `node "$(npm root -g)/@yuwuchen/iconpark-skill/scripts/register-skill.cjs" --unlink` 或 `rm -rf ~/.{claude,codex,...}/skills/iconpark`
 
 Agent 安装检测到 `iconpark update` 提示时，用 `Bash` 执行 `npm update -g @yuwuchen/iconpark-skill --registry https://bnpm.byted.org/`。
 
