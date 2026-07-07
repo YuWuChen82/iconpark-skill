@@ -13,7 +13,8 @@
     "release": "node scripts/release.cjs",
     "release:patch": "node scripts/release.cjs patch",
     "release:minor": "node scripts/release.cjs minor",
-    "release:major": "node scripts/release.cjs major"
+    "release:major": "node scripts/release.cjs major",
+    "postinstall": "node scripts/register-skill.cjs"
   },
   "engines": {
     "node": ">=22"

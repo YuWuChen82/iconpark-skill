@@ -14,7 +14,10 @@
 ```text
 请安装 @yuwuchen/iconpark-skill:
   npm install -g @yuwuchen/iconpark-skill --registry https://bnpm.byted.org/
-  或: npx @yuwuchen/iconpark-skill --version
+完成会做两件事:
+  1. CLI 装到 PATH（iconpark help 可用）
+  2. postinstall 自动软链到本机所有 host runtime 的 skills 目录
+     (Claude Code / Codex CLI / Gemini CLI / OpenCode)
 完成后报告: which iconpark + iconpark help 首行版本号。
 ```
 
@@ -28,6 +31,8 @@
 npm install -g @yuwuchen/iconpark-skill --registry https://bnpm.byted.org/
 iconpark help
 ```
+
+> 需要新建 terminal 才会刷新 PATH。安装完后**重启 host agent** 让新 skill 被加载到路由表。
 
 ---
 
@@ -46,6 +51,22 @@ iconpark help
 
 ---
 
+## 🔗 手动注册（如果 postinstall 跑挂了）
+
+```bash
+ln -s "$(npm root -g)/@yuwuchen/iconpark-skill" ~/.claude/skills/iconpark
+ln -s "$(npm root -g)/@yuwuchen/iconpark-skill" ~/.codex/skills/iconpark
+ln -s "$(npm root -g)/@yuwuchen/iconpark-skill" ~/.gemini/skills/iconpark
+ln -s "$(npm root -g)/@yuwuchen/iconpark-skill" ~/.opencode/skills/iconpark
+
+# 反注册
+node "$(npm root -g)/@yuwuchen/iconpark-skill/scripts/register-skill.cjs" --unlink
+```
+
+> 跳过软链也行——skill 在项目开发阶段可以**本地直跑**：把 `SKILL.md` 复制到 `~/.claude/skills/iconpark/SKILL.md`（不需要 npm），适合你改了 SKILL.md 想立刻测试的场景。
+
+---
+
 ## 🌐 兼容 Runtime
 
 Claude Code · Codex CLI · OpenCode · Hermes · Gemini CLI · Cline / Roo Code · GitHub Copilot · 其它降级走纯文字编号列表。详见 [SKILL.md §一](./SKILL.md)。
@@ -59,6 +80,7 @@ SKILL.md          主规范（host agent 入口）
 scripts/
   iconpark.js     CLI 入口
   lib/            分类 / 命名 / 渲染 / SVG 读 / 模板 / 自更新 (6 子模块)
+  register-skill.cjs   自动软链到 host runtime
 assets/
   goodcase/       31 个规范命名样例
   badcase/        13 个问题样例
