@@ -18,7 +18,7 @@
 完成后报告: which iconpark + iconpark help 首行版本号。
 ```
 
-可通过 `bnpm.bytedance.net` 搜索 `@yuwuchen/iconpark-skill`。
+可通过 [bnpm 网站](https://bnpm.byted.org/package/@yuwuchen/iconpark-skill) 搜索本包。
 
 ---
 
@@ -60,7 +60,7 @@ scripts/
   iconpark.js     CLI 入口
   lib/            分类 / 命名 / 渲染 / SVG 读 / 模板 / 自更新 (6 子模块)
 assets/
-  goodcase/       32 个规范命名样例
+  goodcase/       31 个规范命名样例
   badcase/        13 个问题样例
 ```
 

@@ -2,11 +2,11 @@
 /**
  * scripts/release.cjs
  *
- * 一键发布流程（changeset + npm version + bnppm publish）：
+ * 一键发布流程（changeset + npm version + bnpm publish）：
  *
  * 1. npx changeset       ← 选版本级别（patch/minor/major）,写 changelog
- * 2. npx changeset version   ← bump + 生成 CHANGELOG.md
- * 3. npm version patch/minor/major ← bump VERSION + SKILL.md + git tag
+ * 2. npx changeset version   ← bump + 生成 .changeset/*.md
+ * 3. npm version patch/minor/major ← bump package.json + sync SKILL.md + git tag
  * 4. git push --follow-tags   ← 推送远端
  * 5. npm publish              ← 发到 bnpm
  *
@@ -53,11 +53,11 @@ function run(cmd, opts = {}) {
   console.log('\n=== Step 1: changeset ===');
   run(`npx changeset`, { stdio: 'inherit' });
 
-  // 2. changeset version (bump + CHANGELOG)
+  // 2. changeset version (bump + .changeset/*.md 生成 + 清理已用 changeset)
   console.log('\n=== Step 2: changeset version ===');
   run(`npx changeset version`, { stdio: 'inherit' });
 
-  // 3. npm version (同步 VERSION + SKILL.md)
+  // 3. npm version (sync SKILL.md frontmatter via scripts/sync-version.cjs)
   console.log(`\n=== Step 3: npm version ${level} ===`);
   run(`npm version ${level}`, { stdio: 'inherit' });
 

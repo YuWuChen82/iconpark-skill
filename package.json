@@ -19,6 +19,7 @@
     "node": ">=22"
   },
   "files": [
+    "SKILL.md",
     "scripts/",
     "assets/"
   ],
