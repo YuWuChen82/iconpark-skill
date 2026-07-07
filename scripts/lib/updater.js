@@ -1,35 +1,31 @@
 // updater.js — 自更新机制（基于 bnpm, fire-and-forget，零阻塞）
 // 每次 CLI 启动时后台检查 bnpm 远端版本，命中更新则向 stderr 输出一行黄字提示。
 // SKILL.md 中"自更新协议"章节规定 Agent 看到该提示必须用 AskUserQuestion 询问用户。
-//
-// 相比 v0.5 GitHub git pull 模式（已弃用）：
-// - 安装：npm install -g @yuwuchen/iconpark-skill
-// - 更新：npm update -g @yuwuchen/iconpark-skill
-// - 版本源：bnpm registry（npm view @yuwuchen/iconpark-skill version）
 
-import { promises as fs, statSync, mkdirSync, copyFileSync, readdirSync } from 'node:fs';
+import { promises as fs, statSync, readFileSync, mkdirSync, copyFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 const PACKAGE_NAME = '@yuwuchen/iconpark-skill';
 const BNPM_REGISTRY = 'https://bnpm.byted.org/';
+
+const SKILL_ROOT = process.env.ICONPARK_SKILL_ROOT
+  || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 const CACHE_DIR = path.join(os.homedir(), '.cache', 'iconpark');
 const CACHE_FILE = path.join(CACHE_DIR, 'check.json');
 const BACKUP_ROOT = path.join(CACHE_DIR, 'backups');
 const TTL_MS = 24 * 60 * 60 * 1000;
 
-// 环境变量覆盖（测试/内网用）
 const REGISTRY = process.env.ICONPARK_REGISTRY || BNPM_REGISTRY;
 const PACKAGE = process.env.ICONPARK_PACKAGE_NAME || PACKAGE_NAME;
 
 function parseLocalVersion() {
-  const root = process.env.ICONPARK_SKILL_ROOT
-    || path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..');
   try {
     const pkg = JSON.parse(
-      require('fs').readFileSync(path.join(root, 'package.json'), 'utf8')
+      readFileSync(path.join(SKILL_ROOT, 'package.json'), 'utf8')
     );
     return pkg.version || '0.0.0';
   } catch {
@@ -72,13 +68,14 @@ async function fetchRemoteVersion() {
     const version = body?.['dist-tags']?.latest;
     if (!version) throw new Error('no latest tag in registry response');
     return { version: String(version), source: 'npm' };
-  } catch (e) {
+  } catch {
     // fallback: npm view CLI
     try {
-      const { stdout } = await execFile('npm', [
-        'view', PACKAGE, 'version',
-        '--registry', REGISTRY,
-      ]);
+      const { stdout } = await execFile(
+        'npm',
+        ['view', PACKAGE, 'version', '--registry', REGISTRY],
+        { timeout: 4000 }
+      );
       const v = (stdout || '').toString().trim();
       return v ? { version: v, source: 'npm-cli' } : null;
     } catch {
@@ -88,8 +85,6 @@ async function fetchRemoteVersion() {
     clearTimeout(timer);
   }
 }
-
-// ---------- 主入口：检查更新 ----------
 
 export async function checkForUpdate(localVersion) {
   if (process.env.ICONPARK_NO_UPDATE_NOTIFY === '1')
@@ -120,12 +115,10 @@ export async function checkForUpdate(localVersion) {
       );
     }
     return { updated, local, remote };
-  } catch (e) {
+  } catch {
     return { updated: false, local, remote: null, error: true };
   }
 }
-
-// ---------- update 子命令 ----------
 
 function exists(p) { try { statSync(p); return true; } catch { return false; } }
 
@@ -146,33 +139,32 @@ function copyDirSync(src, dst) {
 async function backupCurrent() {
   const ts = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
   const backupDir = path.join(BACKUP_ROOT, `${ts}_iconpark`);
-  const root = process.env.ICONPARK_SKILL_ROOT
-    || path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..');
   await fs.mkdir(backupDir, { recursive: true });
-  copyDirSync(root, backupDir);
+  copyDirSync(SKILL_ROOT, backupDir);
   return backupDir;
 }
 
 export async function performUpdate() {
   const backupDir = await backupCurrent();
   try {
-    const { stdout } = await execFile('npm', [
-      'update', '-g', PACKAGE,
-      '--registry', REGISTRY,
-    ]);
-    // 重新解析版本号
-    const pkg = JSON.parse(exists(path.join(...)) ? ... : '{}');
-    // 简单版：直接读 package.json
-    const newVersion = parseLocalVersion();
+    execFileSync(
+      'npm',
+      ['update', '-g', PACKAGE, '--registry', REGISTRY],
+      { stdio: 'pipe' }
+    );
     return {
       ok: true,
-      message: `✓ 升级成功：v${newVersion}\n旧版本已备份：${backupDir}`,
-      newVersion,
+      message: `✓ 升级成功：v${parseLocalVersion()}\n旧版本已备份：${backupDir}`,
+      newVersion: parseLocalVersion(),
     };
   } catch (e) {
+    const detail = e.stderr ? e.stderr.toString() : e.message;
     return {
       ok: false,
-      message: `npm update 失败：${e.message}\n已备份到：${backupDir}\n可手动重试: npm update -g ${PACKAGE} --registry ${REGISTRY}`,
+      message:
+        `npm update 失败：${detail}\n` +
+        `已备份到：${backupDir}\n` +
+        `可手动重试: npm update -g ${PACKAGE} --registry ${REGISTRY}`,
     };
   }
 }
